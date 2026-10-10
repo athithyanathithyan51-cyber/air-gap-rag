@@ -1,0 +1,70 @@
+"""Admin command line.
+
+python -m app.cli create-user NAME [--role admin|user]   (password read from prompt or stdin)
+python -m app.cli export-chain OUT.jsonl                 (plus OUT.pub with the public key)
+"""
+
+from __future__ import annotations
+
+import argparse
+import getpass
+import sys
+from pathlib import Path
+
+from sqlalchemy import select
+
+from app.config import get_settings
+from attestation.keys import PUBLIC_FILE
+from auth.security import hash_password
+from db.audit import audit
+from db.models import AttestationBlock, User
+from db.session import Database
+
+
+def _read_password() -> str:
+    if not sys.stdin.isatty():
+        return sys.stdin.readline().rstrip("\n")
+    pw = getpass.getpass("Password (min 10 chars): ")
+    if pw != getpass.getpass("Repeat password: "):
+        raise SystemExit("passwords do not match")
+    return pw
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(prog="python -m app.cli")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    cu = sub.add_parser("create-user")
+    cu.add_argument("username")
+    cu.add_argument("--role", choices=["admin", "user"], default="user")
+    ex = sub.add_parser("export-chain")
+    ex.add_argument("out", type=Path)
+    args = ap.parse_args(argv)
+
+    settings = get_settings()
+    db = Database(settings.db_path)
+    with db.session() as s:
+        if args.cmd == "create-user":
+            name = args.username.lower()
+            if s.scalar(select(User).where(User.username == name)):
+                print(f"user {name} already exists", file=sys.stderr)
+                return 1
+            try:
+                pw_hash = hash_password(_read_password())
+            except ValueError as exc:
+                print(f"error: {exc}", file=sys.stderr)
+                return 1
+            s.add(User(username=name, password_hash=pw_hash, role=args.role))
+            s.commit()
+            audit(s, "cli", "user.create", username=name, role=args.role)
+            print(f"created {args.role} {name}")
+            return 0
+        blocks = s.scalars(select(AttestationBlock).order_by(AttestationBlock.index)).all()
+        args.out.write_text("".join(b.body + "\n" for b in blocks), encoding="utf-8")
+        pub = settings.keys_dir / PUBLIC_FILE
+        args.out.with_suffix(".pub").write_bytes(pub.read_bytes())
+        print(f"exported {len(blocks)} blocks to {args.out} (public key: {args.out.with_suffix('.pub')})")
+        return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

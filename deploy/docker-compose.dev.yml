@@ -1,0 +1,27 @@
+# Windows/macOS development only: Docker Desktop's "host" network is the Docker VM,
+# so Qdrant and Ollama are published on 127.0.0.1 instead, and the app runs natively.
+# Production (Linux) uses docker-compose.yml with host networking.
+#   docker compose -f deploy/docker-compose.dev.yml up -d
+name: airgap-dev
+
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.19.2@sha256:b7b0444c4c351c970b98e90a6f89c2ee4287c65b44e52b4cb503fa5b2aa927ad
+    restart: unless-stopped
+    environment:
+      QDRANT__TELEMETRY_DISABLED: "true"
+    ports: ["127.0.0.1:6333:6333"]
+    volumes: [qdrant_data:/qdrant/storage]
+
+  ollama:
+    image: ollama/ollama:0.40.2@sha256:b86366bb528bbf7f1424435d165028497a5b69bf6ddb4fa5a87102e2b79f44fb
+    restart: unless-stopped
+    environment:
+      OLLAMA_KEEP_ALIVE: 30m
+      OLLAMA_NUM_PARALLEL: "2"
+    ports: ["127.0.0.1:11434:11434"]
+    volumes: [ollama_models:/root/.ollama]
+
+volumes:
+  qdrant_data:
+  ollama_models:

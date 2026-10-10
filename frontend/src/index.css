@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+/* System font stacks only: no web fonts are downloaded or bundled. */
+@theme {
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
+}

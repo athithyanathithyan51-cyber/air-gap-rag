@@ -1,0 +1,35 @@
+# Single source of truth for Python dependencies (conda-forge only).
+# Exact pins with hashes live in conda-lock.yml; regenerate with:
+#   conda-lock lock -f environment.yml -p linux-64 -p win-64 --lockfile conda-lock.yml
+name: airgap
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.11.*
+  # runtime
+  - fastapi
+  - uvicorn
+  - pydantic>=2.9
+  - pydantic-settings
+  - sqlalchemy>=2.0.36
+  - alembic
+  - httpx
+  - qdrant-client
+  - pypdf
+  - pdfplumber
+  - python-docx
+  - argon2-cffi
+  - pyjwt
+  - cryptography
+  - psutil
+  - python-multipart
+  - slowapi
+  # dev / test
+  - pytest
+  - pytest-asyncio
+  - ruff
+  - mypy
+  - types-psutil
+  - hatchling
+  - pre-commit
