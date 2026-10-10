@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Runtime data (never commit)
+data/
+*.db
+*.db-wal
+*.db-shm
+*.log
+keys/
+
+# Large artifacts (built locally, moved by USB)
+bundle/out/
+models/
+*.tar
+*.tar.gz
+*.gguf
+
+# Captures are committed only when explicitly added under docs/evidence
+*.pcap
+*.pcapng
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
