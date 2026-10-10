@@ -105,7 +105,13 @@ import sys; from sqlalchemy import select, func
 from app.config import get_settings; from db.session import Database; from db.models import User
 s = Database(get_settings().db_path).session(); sys.exit(0 if s.scalar(select(func.count()).select_from(User)) else 1)"; then
   log "Create the first admin account"
-  "${COMPOSE[@]}" exec app python -m app.cli create-user "${AIRGAP_ADMIN_USER:-admin}" --role admin
+  if [ -n "${AIRGAP_ADMIN_PASSWORD_FILE:-}" ]; then
+    # Unattended install: password read from a root-only file, never from the command line.
+    "${COMPOSE[@]}" exec -T app python -m app.cli create-user "${AIRGAP_ADMIN_USER:-admin}" --role admin \
+      < "$AIRGAP_ADMIN_PASSWORD_FILE"
+  else
+    "${COMPOSE[@]}" exec app python -m app.cli create-user "${AIRGAP_ADMIN_USER:-admin}" --role admin
+  fi
 fi
 
 log "Installed $VERSION. Open http://127.0.0.1:$(grep -oP '^AIRGAP_BIND_PORT=\K.*' "$ETC/airgap.env")/ on this machine."

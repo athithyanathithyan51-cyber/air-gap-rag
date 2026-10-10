@@ -1,4 +1,6 @@
 # All services use host networking and bind to 127.0.0.1 only.
+# Images are loaded from the offline bundle (docker load) and never pulled: pull_policy: never.
+# Their integrity is checked by install.sh against manifest.sha256; build_bundle.sh pulls them by digest.
 #
 # Why host networking: the isolation monitor must observe the HOST's network
 # interfaces. A container on a bridge network only sees its own namespace, so
@@ -11,7 +13,8 @@ name: airgap
 
 services:
   qdrant:
-    image: qdrant/qdrant:v1.19.2@sha256:b7b0444c4c351c970b98e90a6f89c2ee4287c65b44e52b4cb503fa5b2aa927ad
+    image: qdrant/qdrant:v1.19.2
+    pull_policy: never
     network_mode: host
     restart: unless-stopped
     environment:
@@ -23,7 +26,8 @@ services:
       - qdrant_data:/qdrant/storage
 
   ollama:
-    image: ollama/ollama:0.40.2@sha256:b86366bb528bbf7f1424435d165028497a5b69bf6ddb4fa5a87102e2b79f44fb
+    image: ollama/ollama:0.40.2
+    pull_policy: never
     network_mode: host
     restart: unless-stopped
     environment:
@@ -36,6 +40,7 @@ services:
 
   app:
     image: airgap-assistant:${AIRGAP_VERSION:-dev}
+    pull_policy: never
     build:
       context: ..
       dockerfile: deploy/Dockerfile

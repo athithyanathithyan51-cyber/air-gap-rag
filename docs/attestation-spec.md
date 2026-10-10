@@ -28,7 +28,10 @@ Every answer appends one block. Blocks are serialised as canonical JSON: UTF-8, 
 | `sig` | base64 | Ed25519 signature over the `block_hash` bytes |
 
 ### Network snapshot (`net`)
-- `interfaces`: one entry for every non-loopback interface, with `{name, up, addrs[], kind}`. `kind` is `physical`, `virtual`, or `container-bridge`.
+- `interfaces`: one entry for every non-loopback interface, with `{name, up, admin_up, oper, addrs[], kind}`.
+  - `admin_up` is the kernel IFF_UP flag. `oper` is the RFC 2863 operational state from `/sys/class/net/<if>/operstate`.
+  - `up` = `admin_up` and `oper` not in {down, lowerlayerdown, notpresent}. A network card with its cable unplugged is administratively up, but `oper=down` means it cannot carry traffic, so `up` is false. The policy uses `up`.
+  - `kind` is `physical`, `virtual`, or `container-bridge`.
 - `default_route_v4` and `default_route_v6`: boolean values.
 - `policy`: the isolation policy in force, copied into the block so a verifier needs no extra configuration.
 

@@ -192,6 +192,19 @@ def test_real_snapshot_shape() -> None:
     snap = snapshot()
     assert set(snap) == {"platform", "interfaces", "default_route_v4", "default_route_v6"}
     for iface in snap["interfaces"]:
-        assert set(iface) == {"name", "up", "addrs", "kind"}
+        assert set(iface) == {"name", "up", "admin_up", "oper", "addrs", "kind"}
+        assert iface["up"] == (iface["admin_up"] and iface["oper"] not in ("down", "lowerlayerdown", "notpresent"))
         assert iface["name"] != "lo"
     vc.canonical_json(snap)  # must be signable (no floats)
+
+
+def test_operstate_reading(tmp_path: Path) -> None:
+    from attestation.netsnap import operstate
+
+    (tmp_path / "enp0s3").mkdir()
+    (tmp_path / "enp0s3" / "operstate").write_text("down\n")
+    (tmp_path / "wlan0").mkdir()
+    (tmp_path / "wlan0" / "operstate").write_text("up\n")
+    assert operstate("enp0s3", tmp_path) == "down"  # cable unplugged: admin-up but cannot carry traffic
+    assert operstate("wlan0", tmp_path) == "up"
+    assert operstate("missing", tmp_path) == "unknown"

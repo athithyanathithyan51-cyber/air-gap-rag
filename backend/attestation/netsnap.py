@@ -83,6 +83,17 @@ def default_routes_windows() -> tuple[bool, bool]:
     return v4, v6
 
 
+LINK_DOWN_STATES = frozenset({"down", "lowerlayerdown", "notpresent"})
+
+
+def operstate(name: str, sys_class_net: Path = Path("/sys/class/net")) -> str:
+    """Kernel RFC 2863 operational state: up, down, dormant, lowerlayerdown, notpresent, testing, unknown."""
+    try:
+        return (sys_class_net / name / "operstate").read_text().strip() or "unknown"
+    except OSError:
+        return "unknown"
+
+
 def snapshot(sys_class_net: Path = Path("/sys/class/net"), proc_net: Path = Path("/proc/net")) -> dict[str, Any]:
     system = platform.system().lower()
     stats = psutil.net_if_stats()
@@ -94,10 +105,15 @@ def snapshot(sys_class_net: Path = Path("/sys/class/net"), proc_net: Path = Path
             continue
         st = stats.get(name)
         ips = sorted(a.address for a in addrs if a.family in (socket.AF_INET, socket.AF_INET6))
+        admin_up = bool(st.isup) if st else False
+        oper = operstate(name, sys_class_net) if system == "linux" else ("up" if admin_up else "down")
         interfaces.append(
             {
                 "name": name,
-                "up": bool(st.isup) if st else False,
+                # Can carry traffic: administratively up AND the link is not down (cable/carrier present).
+                "up": admin_up and oper not in LINK_DOWN_STATES,
+                "admin_up": admin_up,
+                "oper": oper,
                 "addrs": ips,
                 "kind": _kind_linux(name, sys_class_net) if system == "linux" else _kind_other(name),
             }
