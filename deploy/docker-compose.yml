@@ -1,0 +1,65 @@
+# All services use host networking and bind to 127.0.0.1 only.
+#
+# Why host networking: the isolation monitor must observe the HOST's network
+# interfaces. A container on a bridge network only sees its own namespace, so
+# its snapshot would say nothing about the machine. Binding every service to
+# loopback means nothing listens on a non-loopback address.
+# On Windows/macOS Docker Desktop, "host" is the Docker VM, not the real host:
+# attestation there does not reflect the physical machine (see docs/limits.md).
+
+name: airgap
+
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.19.2@sha256:b7b0444c4c351c970b98e90a6f89c2ee4287c65b44e52b4cb503fa5b2aa927ad
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      QDRANT__SERVICE__HOST: 127.0.0.1
+      QDRANT__SERVICE__HTTP_PORT: "6333"
+      QDRANT__SERVICE__GRPC_PORT: "6334"
+      QDRANT__TELEMETRY_DISABLED: "true"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  ollama:
+    image: ollama/ollama:0.40.2@sha256:b86366bb528bbf7f1424435d165028497a5b69bf6ddb4fa5a87102e2b79f44fb
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      OLLAMA_HOST: 127.0.0.1:11434
+      OLLAMA_KEEP_ALIVE: 30m
+      OLLAMA_NUM_PARALLEL: "2"
+      OLLAMA_MAX_LOADED_MODELS: "2"
+    volumes:
+      - ollama_models:/root/.ollama
+
+  app:
+    image: airgap-assistant:${AIRGAP_VERSION:-dev}
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    network_mode: host
+    restart: unless-stopped
+    depends_on: [qdrant, ollama]
+    environment:
+      AIRGAP_ENVIRONMENT: production
+      AIRGAP_ATTESTATION_PASSPHRASE_FILE: /run/secrets/attestation_pass
+      AIRGAP_BIND_HOST: ${AIRGAP_BIND_HOST:-127.0.0.1}
+      AIRGAP_BIND_PORT: ${AIRGAP_BIND_PORT:-8000}
+      AIRGAP_QDRANT_URL: http://127.0.0.1:6333
+      AIRGAP_OLLAMA_URL: http://127.0.0.1:11434
+      AIRGAP_CHAT_MODEL: ${AIRGAP_CHAT_MODEL:-qwen2.5:7b-instruct-q4_K_M}
+      AIRGAP_EMBED_MODEL: nomic-embed-text
+    volumes:
+      - app_data:/srv/data
+      - ${AIRGAP_ETC:-/etc/airgap}/attestation.pass:/run/secrets/attestation_pass:ro
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+
+volumes:
+  qdrant_data:
+  ollama_models:
+  app_data:

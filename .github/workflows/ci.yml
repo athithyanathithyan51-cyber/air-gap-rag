@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Create env from conda-lock.yml (conda-forge, exact pins + sha256)
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          micromamba-version: "2.9.0-0"
+          environment-file: backend/conda-lock.yml
+          environment-name: airgap
+          cache-environment: true
+      - name: Ruff lint
+        run: ruff check .
+      - name: Ruff format check
+        run: ruff format --check .
+      - name: Mypy (strict)
+        run: mypy
+      - name: Pytest
+        run: pytest
+
+  frontend:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-fund --no-audit
+      - run: npm run lint
+      - run: npm test
+      - name: Build (includes external-reference check)
+        run: npm run build
+
+  docker:
+    runs-on: ubuntu-24.04
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build app image
+        run: docker build -f deploy/Dockerfile -t airgap-assistant:ci .
+      - name: Smoke test image (no network)
+        run: |
+          docker run -d --name app --network none -e AIRGAP_BIND_HOST=127.0.0.1 airgap-assistant:ci
+          for i in $(seq 1 30); do
+            if docker exec app python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read().decode())"; then
+              docker rm -f app; exit 0
+            fi
+            sleep 1
+          done
+          docker logs app; docker rm -f app; exit 1
+      - name: Validate compose file
+        run: docker compose -f deploy/docker-compose.yml config --quiet

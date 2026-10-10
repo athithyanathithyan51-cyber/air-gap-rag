@@ -1,0 +1,29 @@
+# Hooks run from the local environment (no hook repos are downloaded), so
+# pre-commit works on an offline developer machine too.
+repos:
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff lint
+        entry: micromamba run -n airgap --cwd backend ruff check --fix
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: ruff-format
+        name: ruff format
+        entry: micromamba run -n airgap --cwd backend ruff format
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: mypy
+        name: mypy strict
+        entry: micromamba run -n airgap --cwd backend mypy
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: frontend-lint
+        name: eslint
+        entry: npm --prefix frontend run lint
+        language: system
+        files: ^frontend/
+        pass_filenames: false

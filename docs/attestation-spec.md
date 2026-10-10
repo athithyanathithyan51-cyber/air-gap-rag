@@ -1,4 +1,4 @@
-# Attestation specification (v1, draft)
+# Attestation specification (v1)
 
 ## What it is
 **A tamper-evident record of network-interface state at the moment of each answer.**
@@ -16,7 +16,8 @@ Every answer appends one block. Blocks are serialised as canonical JSON: UTF-8, 
 | `counter` | int | Monotonic counter persisted on disk; strictly +1 per block, never reset |
 | `query_hash` | hex | SHA-256 of the user's question (NFC-normalised UTF-8) |
 | `chunk_hashes` | [hex] | SHA-256 of each retrieved chunk's text, in rank order |
-| `answer_hash` | hex | SHA-256 of the final answer text |
+| `answer_hash` | hex | SHA-256 of the final answer text (the refusal text for "I don't know") |
+| `outcome` | string | `answered:grounded` or `refused:<reason>` |
 | `citations` | [object] | `{doc_id, doc_sha256, page, section}` for each cited source |
 | `net` | object | Network snapshot (below) |
 | `isolated` | bool | Verdict of the isolation policy for this snapshot |
@@ -39,10 +40,10 @@ Every answer appends one block. Blocks are serialised as canonical JSON: UTF-8, 
 
 **Why there is an allowlist.** Docker creates a host-only bridge, `docker0`, which is up whenever Docker runs. Without an allowlist, the Docker deployment could never be ISOLATED. The default allowlist is `docker0` and `br-*`. Tunnel interfaces (`tun*`, `wg*`, `ppp*`) are never allowed, because they are how traffic would leave.
 
-**Air-gapped LAN mode (opt-in, v1.0.0).** In this mode, `physical` interfaces whose names are allowlisted may be up, as long as no default route exists. This serves an isolated LAN where users connect from other machines. Every block records the policy mode, so an auditor can see which rule was applied.
+**Air-gapped LAN mode (opt-in, `AIRGAP_ISOLATION_MODE=lan`).** In this mode, `physical` interfaces whose names are allowlisted may be up, as long as no default route exists. This serves an isolated LAN where users connect from other machines. Every block records the policy mode, so an auditor can see which rule was applied.
 
 ## Monitor
-`isolation_monitor` polls every second (planned; the interval will be measured). When an interface not permitted by the policy comes up, it:
+The monitor (`attestation/monitor.py`) polls every second (`AIRGAP_MONITOR_INTERVAL_S`). Detection latency on real hardware is **untested**. When an interface not permitted by the policy comes up, it:
 1. writes a `break` event to the audit log, and
 2. sets `monitor_state=NOT-ISOLATED`.
 
@@ -50,10 +51,10 @@ This state is sticky: every later block carries it until an admin acknowledges. 
 
 ## Keys
 - One Ed25519 keypair is generated at install time.
-- The private key is encrypted at rest with a key derived from the admin passphrase (scrypt, then AES-GCM).
-- The public key is exported to `keys/attestation.pub`. Auditors verify blocks with this public key only.
+- The private key is stored as PKCS#8, encrypted with the admin passphrase using the `cryptography` library's `BestAvailableEncryption`. The passphrase lives in `/etc/airgap/attestation.pass` (root and the app's group only).
+- The public key is exported to `keys/attestation.pub` and from **Admin → Public key**. Auditors verify blocks with this public key only.
 
-## Verification (`verify_chain.py`, standalone, offline)
+## Verification (`backend/attestation/verify_chain.py`, standalone, offline)
 For each block in order, the verifier checks:
 1. canonical recomputation of `block_hash`,
 2. the `sig` signature against the public key,
