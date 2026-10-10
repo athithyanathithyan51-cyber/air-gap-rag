@@ -14,6 +14,8 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from api import admin_routes, attestation_routes, auth_routes, chat_routes, document_routes
+from api.deps import Services
 from app.config import Settings, get_settings
 from app.logging import configure_logging
 from app.net_guard import install_guard
@@ -89,9 +91,15 @@ def create_app(
     settings: Settings | None = None,
     readiness_checks: Sequence[ReadinessCheck] | None = None,
     frontend_dist: Path | None = None,
+    services: Services | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
     checks = list(readiness_checks) if readiness_checks is not None else default_checks(settings)
+    if services is None:
+        from app.services import build_services
+
+        services = build_services(settings)
+    svc = services
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -103,8 +111,11 @@ def create_app(
         )
         if settings.net_guard_enabled:
             install_guard([*settings.net_allowed_hosts, *_service_hosts(settings)])
+        if settings.monitor_enabled:
+            svc.monitor.start()
         log.info("startup", extra={"version": APP_VERSION, "environment": settings.environment})
         yield
+        svc.monitor.stop()
         log.info("shutdown")
 
     # Swagger/ReDoc pages load JS from public CDNs, so they are disabled entirely.
@@ -116,6 +127,10 @@ def create_app(
         openapi_url="/api/openapi.json" if settings.environment == "development" else None,
         lifespan=lifespan,
     )
+
+    app.state.services = svc
+    for r in (auth_routes, document_routes, chat_routes, attestation_routes, admin_routes):
+        app.include_router(r.router)
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:

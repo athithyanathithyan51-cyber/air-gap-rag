@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.main import APP_VERSION, SECURITY_HEADERS, create_app
-from tests.conftest import make_settings, static_check
+from tests.conftest import make_services, make_settings, static_check
 
 
 def test_health_ok(client: TestClient) -> None:
@@ -34,6 +34,7 @@ def test_ready_reports_failure(tmp_path: Path) -> None:
         make_settings(tmp_path),
         readiness_checks=[static_check("qdrant", True), static_check("ollama", False)],
         frontend_dist=tmp_path / "no-dist",
+        services=make_services(tmp_path).services,
     )
     with TestClient(app) as c:
         r = c.get("/ready")
@@ -53,7 +54,9 @@ def test_frontend_served_when_built(tmp_path: Path) -> None:
     dist = tmp_path / "dist"
     dist.mkdir()
     (dist / "index.html").write_text("<!doctype html><title>t</title>", encoding="utf-8")
-    app = create_app(make_settings(tmp_path), readiness_checks=[], frontend_dist=dist)
+    app = create_app(
+        make_settings(tmp_path), readiness_checks=[], frontend_dist=dist, services=make_services(tmp_path).services
+    )
     with TestClient(app) as c:
         r = c.get("/")
     assert r.status_code == 200
