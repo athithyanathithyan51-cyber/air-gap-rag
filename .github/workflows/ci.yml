@@ -64,13 +64,20 @@ jobs:
         run: docker build -f deploy/Dockerfile -t airgap-assistant:ci .
       - name: Smoke test image (no network)
         run: |
-          docker run -d --name app --network none -e AIRGAP_BIND_HOST=127.0.0.1 airgap-assistant:ci
+          docker run -d --name app --network none -e AIRGAP_BIND_HOST=127.0.0.1 \
+            -e AIRGAP_ATTESTATION_PASSPHRASE=ci-only-test-passphrase airgap-assistant:ci
           for i in $(seq 1 30); do
             if docker exec app python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read().decode())"; then
-              docker rm -f app; exit 0
+              docker exec app python -m pytest -q -p no:warnings
+              status=$?; docker rm -f app; exit $status
             fi
             sleep 1
           done
           docker logs app; docker rm -f app; exit 1
+      - name: Production mode refuses to start without a passphrase
+        run: |
+          if docker run --rm --network none airgap-assistant:ci; then
+            echo "app started without an attestation passphrase"; exit 1
+          fi
       - name: Validate compose file
         run: docker compose -f deploy/docker-compose.yml config --quiet
