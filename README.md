@@ -18,14 +18,21 @@ Team: Athithyan G (backend, RAG, attestation) · Praneeth C P (frontend, integra
 The offline bundle and its install script arrive in Phase 2. These steps will be filled in once `bundle/build_bundle.sh` exists and has been tested.
 
 ## Development
-Prerequisites: Python 3.11 with [uv](https://docs.astral.sh/uv/) 0.10+, Node 22 and Docker.
+Prerequisites: [micromamba](https://mamba.readthedocs.io/) 2.x, Node 22 and Docker.
+
+Python packages come only from conda-forge. `backend/conda-lock.yml` pins exact versions with sha256 hashes for linux-64 and win-64, and the same lockfile is used in dev, CI and the Docker image.
 
 ```bash
 # backend
 cd backend
-uv sync --frozen
-uv run ruff check . && uv run mypy && uv run pytest
-uv run airgap-server            # http://127.0.0.1:8000/health
+micromamba create -n airgap -f conda-lock.yml
+micromamba run -n airgap ruff check .
+micromamba run -n airgap mypy
+micromamba run -n airgap pytest
+micromamba run -n airgap python -m app.main      # http://127.0.0.1:8000/health
+
+# after editing environment.yml, regenerate the lockfile:
+conda-lock lock --micromamba -f environment.yml -p linux-64 -p win-64 --lockfile conda-lock.yml
 
 # frontend
 cd frontend
