@@ -19,6 +19,7 @@ RUN micromamba create -y -p /opt/env -f /tmp/conda-lock.yml \
  && micromamba clean -a -y \
  && rm /tmp/conda-lock.yml
 COPY --chown=$MAMBA_USER:$MAMBA_USER backend/ /srv/backend/
+COPY --chown=$MAMBA_USER:$MAMBA_USER scripts/ /srv/scripts/
 COPY --from=frontend --chown=$MAMBA_USER:$MAMBA_USER /build/frontend/dist /srv/frontend/dist
 ENV PATH=/opt/env/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \
