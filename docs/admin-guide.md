@@ -63,11 +63,17 @@ sudo ./install.sh
 | `AIRGAP_CHAT_MODEL` | `llama3.2:3b-instruct-q4_K_M` | `qwen2.5:7b-instruct-q4_K_M` gives better citations and resists prompt injection better, but is about 2x slower (p95 63 s vs 34 s on an i5-12450H / 16 GB laptop). Use it on machines with more than 16 GB RAM or a GPU |
 | `AIRGAP_MIN_SCORE` | `0.55` | Retrieval similarity below which the answer is "I don't know" without calling the model. Tune it with `eval/run_eval.py` |
 | `AIRGAP_GENERAL_CHAT` | `true` | Below `AIRGAP_MIN_SCORE`, answer greetings and general questions from the model's own knowledge, labelled "General answer, not from your documents". Set `false` for strict documents-only mode ("I don't know") |
-| `AIRGAP_TOP_K` | `5` | Passages retrieved per question |
+| `AIRGAP_TOP_K` | `3` | Passages retrieved per question. Fewer passages make a shorter prompt and a faster answer. On the demo set, 3 finds the right document as often as 5 |
+| `AIRGAP_MAX_CONTEXT_CHARS` | `8000` | Maximum document text sent to the model per question |
+| `AIRGAP_LLM_NUM_CTX` | `4096` | Model context window, in tokens. Larger uses more RAM/VRAM and is slower |
+| `AIRGAP_LLM_NUM_PREDICT` | `512` | Maximum answer length, in tokens |
+| `AIRGAP_LLM_WARM_UP` | `true` | Load the models at startup, so the first question does not wait 30–40 s for them |
 | `AIRGAP_BIND_HOST` | `127.0.0.1` | Keep this on loopback. Exposing it on a LAN needs TLS (v1.0.0) and LAN isolation mode |
 
 Apply changes with:
 `sudo docker compose -p airgap -f /opt/airgap/docker-compose.yml --env-file /etc/airgap/airgap.env up -d`
+
+**NVIDIA GPU (optional, much faster).** If the host has an NVIDIA GPU, its driver and `nvidia-container-toolkit` installed, add `-f /opt/airgap/docker-compose.gpu.yml` after the first `-f`. The RC1 bundle does not ship the toolkit. Check with `sudo docker exec airgap-ollama-1 ollama ps`: the PROCESSOR column should say `100% GPU`.
 
 ## 6. Backup, upgrade, rollback
 - **Upgrade:** unpack the new bundle and run `sudo ./install.sh`. The app-data volume (users, documents, audit, chain) is backed up to `/var/backups/airgap/` first.

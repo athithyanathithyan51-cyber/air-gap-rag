@@ -18,9 +18,16 @@ services:
     restart: unless-stopped
     environment:
       OLLAMA_KEEP_ALIVE: 30m
-      OLLAMA_NUM_PARALLEL: "2"
+      OLLAMA_NUM_PARALLEL: "1"  # one KV cache: faster single answers on CPU and small GPUs
+      OLLAMA_MAX_LOADED_MODELS: "2"  # keep the chat and embedding models both loaded
     ports: ["127.0.0.1:11434:11434"]
     volumes: [ollama_models:/root/.ollama]
+    # Use the NVIDIA GPU when Docker can see one (Docker Desktop + WSL2 on the dev laptop).
+    # Remove this block on machines without an NVIDIA GPU if the container refuses to start.
+    deploy:
+      resources:
+        reservations:
+          devices: [{ driver: nvidia, count: all, capabilities: [gpu] }]
 
 volumes:
   qdrant_data:

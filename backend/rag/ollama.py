@@ -34,13 +34,15 @@ class OllamaClient:
         embed_model: str,
         timeout_s: float = 300.0,
         temperature: float = 0.1,
-        num_ctx: int = 8192,
+        num_ctx: int = 4096,
+        num_predict: int = 512,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.chat_model = chat_model
         self.embed_model = embed_model
         self.temperature = temperature
         self.num_ctx = num_ctx
+        self.num_predict = num_predict
         self._timeout = httpx.Timeout(timeout_s, connect=5.0)
 
     def _client(self) -> httpx.AsyncClient:
@@ -65,12 +67,22 @@ class OllamaClient:
     async def embed_query(self, text: str) -> list[float]:
         return (await self._embed([QUERY_PREFIX + text]))[0]
 
+    async def warm_up(self, keep_alive: str = "30m") -> None:
+        """Load the chat and embedding models so the first question does not pay the load time."""
+        async with self._client() as c:
+            r = await c.post(
+                "/api/generate",
+                json={"model": self.chat_model, "keep_alive": keep_alive, "options": {"num_ctx": self.num_ctx}},
+            )
+            r.raise_for_status()
+        await self.embed_query("warm up")
+
     async def stream_chat(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
         payload: dict[str, Any] = {
             "model": self.chat_model,
             "messages": messages,
             "stream": True,
-            "options": {"temperature": self.temperature, "num_ctx": self.num_ctx},
+            "options": {"temperature": self.temperature, "num_ctx": self.num_ctx, "num_predict": self.num_predict},
         }
         try:
             async with self._client() as c, c.stream("POST", "/api/chat", json=payload) as r:

@@ -1,0 +1,13 @@
+# Optional GPU override for the production stack.
+#
+#   sudo docker compose -f docker-compose.yml -f docker-compose.gpu.yml --env-file /etc/airgap/airgap.env up -d
+#
+# Needs an NVIDIA driver and nvidia-container-toolkit on the host. The RC1 offline bundle does not ship
+# the toolkit, so on an air-gapped host install it from your own offline mirror first. Without this file,
+# Ollama runs on the CPU.
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices: [{ driver: nvidia, count: all, capabilities: [gpu] }]
