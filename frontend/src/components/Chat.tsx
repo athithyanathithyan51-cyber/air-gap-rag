@@ -17,6 +17,7 @@ const REASONS: Record<string, string> = {
   model_declined: "The model found no answer in the retrieved passages.",
   no_valid_citation: "The draft answer did not cite a retrieved source, so it was withheld.",
   unsupported: "The draft answer was not supported by its cited sources, so it was withheld.",
+  unsafe_content: "The draft answer asked for a password or other credentials, so it was withheld.",
 };
 
 function location(c: { filename: string; page: number | null; section: string | null }) {
