@@ -60,7 +60,7 @@ sudo ./install.sh
 ## 5. Configuration (`/etc/airgap/airgap.env`)
 | Variable | Default | Meaning |
 |---|---|---|
-| `AIRGAP_CHAT_MODEL` | `qwen2.5:7b-instruct-q4_K_M` | Use `llama3.2:3b-instruct-q4_K_M` on machines with less than 16 GB RAM |
+| `AIRGAP_CHAT_MODEL` | `llama3.2:3b-instruct-q4_K_M` | `qwen2.5:7b-instruct-q4_K_M` gives better citations and resists prompt injection better, but is about 2x slower (p95 63 s vs 34 s on an i5-12450H / 16 GB laptop). Use it on machines with more than 16 GB RAM or a GPU |
 | `AIRGAP_MIN_SCORE` | `0.55` | Retrieval similarity below which the answer is "I don't know" without calling the model. Tune it with `eval/run_eval.py` |
 | `AIRGAP_GENERAL_CHAT` | `true` | Below `AIRGAP_MIN_SCORE`, answer greetings and general questions from the model's own knowledge, labelled "General answer, not from your documents". Set `false` for strict documents-only mode ("I don't know") |
 | `AIRGAP_TOP_K` | `5` | Passages retrieved per question |

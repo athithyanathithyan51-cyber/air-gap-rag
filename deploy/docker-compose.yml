@@ -54,7 +54,7 @@ services:
       AIRGAP_BIND_PORT: ${AIRGAP_BIND_PORT:-8000}
       AIRGAP_QDRANT_URL: http://127.0.0.1:6333
       AIRGAP_OLLAMA_URL: http://127.0.0.1:11434
-      AIRGAP_CHAT_MODEL: ${AIRGAP_CHAT_MODEL:-qwen2.5:7b-instruct-q4_K_M}
+      AIRGAP_CHAT_MODEL: ${AIRGAP_CHAT_MODEL:-llama3.2:3b-instruct-q4_K_M}
       AIRGAP_EMBED_MODEL: nomic-embed-text
     volumes:
       - app_data:/srv/data

@@ -65,7 +65,7 @@ RC1 scope cuts, moved to v1.0.0:
 
 ## STACK (pin exact versions in lockfiles)
 - **Inference:** Ollama.
-  - Default model: qwen2.5:7b-instruct-q4_K_M. Fallback: llama3.2:3b-instruct-q4_K_M.
+  - Default model (RC1): llama3.2:3b-instruct-q4_K_M. Optional larger model: qwen2.5:7b-instruct-q4_K_M (2x slower on 16 GB; candidate default for the semester-end review). Decision and evidence: docs/architecture.md.
   - Embeddings: nomic-embed-text.
   - Optional offline reranker: bge-reranker.
 - **Backend:** Python 3.11, FastAPI, Uvicorn, Pydantic v2, SQLAlchemy 2 + Alembic, SQLite (WAL).
