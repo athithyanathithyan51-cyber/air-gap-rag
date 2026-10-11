@@ -62,6 +62,7 @@ sudo ./install.sh
 |---|---|---|
 | `AIRGAP_CHAT_MODEL` | `qwen2.5:7b-instruct-q4_K_M` | Use `llama3.2:3b-instruct-q4_K_M` on machines with less than 16 GB RAM |
 | `AIRGAP_MIN_SCORE` | `0.55` | Retrieval similarity below which the answer is "I don't know" without calling the model. Tune it with `eval/run_eval.py` |
+| `AIRGAP_GENERAL_CHAT` | `true` | Below `AIRGAP_MIN_SCORE`, answer greetings and general questions from the model's own knowledge, labelled "General answer, not from your documents". Set `false` for strict documents-only mode ("I don't know") |
 | `AIRGAP_TOP_K` | `5` | Passages retrieved per question |
 | `AIRGAP_BIND_HOST` | `127.0.0.1` | Keep this on loopback. Exposing it on a LAN needs TLS (v1.0.0) and LAN isolation mode |
 

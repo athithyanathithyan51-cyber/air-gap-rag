@@ -45,7 +45,14 @@ def citation_record(src: Source) -> dict[str, Any]:
 async def chat(body: ChatIn, user: UserDep, svc: SvcDep, s: SessionDep) -> StreamingResponse:
     st = svc.settings
     engine = AnswerEngine(
-        s, svc.store, svc.embedder, svc.llm, st.top_k, st.min_score, max_context_chars=st.max_context_chars
+        s,
+        svc.store,
+        svc.embedder,
+        svc.llm,
+        st.top_k,
+        st.min_score,
+        max_context_chars=st.max_context_chars,
+        general_chat=st.general_chat,
     )
     username = user.username
 

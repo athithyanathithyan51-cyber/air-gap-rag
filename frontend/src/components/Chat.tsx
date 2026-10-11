@@ -17,6 +17,7 @@ const REASONS: Record<string, string> = {
   model_declined: "The model found no answer in the retrieved passages.",
   no_valid_citation: "The draft answer did not cite a retrieved source, so it was withheld.",
   unsupported: "The draft answer was not supported by its cited sources, so it was withheld.",
+  unsafe_content: "The draft answer asked for a password or other credentials, so it was withheld.",
 };
 
 function location(c: { filename: string; page: number | null; section: string | null }) {
@@ -91,7 +92,7 @@ export default function Chat({ me }: { me: Me }) {
                 {t.error && <p className="text-red-700">⚠ {t.error}</p>}
                 {!t.error && !t.final && (
                   <p className="whitespace-pre-wrap text-slate-700">
-                    {t.draft || <span className="text-slate-400">Searching documents…</span>}
+                    {t.draft || <span className="text-slate-400">Thinking…</span>}
                     {t.pending && <span className="animate-pulse">▍</span>}
                   </p>
                 )}
@@ -100,6 +101,11 @@ export default function Chat({ me }: { me: Me }) {
                     <p className={`whitespace-pre-wrap ${t.final.status === "refused" ? "text-slate-600 italic" : ""}`}>
                       {t.final.answer}
                     </p>
+                    {t.final.reason === "general" && (
+                      <p className="mt-2 inline-block rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs text-amber-900">
+                        General answer, not from your documents. Verify important facts.
+                      </p>
+                    )}
                     {t.final.status === "refused" && (
                       <p className="mt-1 text-xs text-slate-500">{REASONS[t.final.reason] ?? t.final.reason}</p>
                     )}

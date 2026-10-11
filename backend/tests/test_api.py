@@ -120,7 +120,20 @@ def test_end_to_end_answer_with_citation_and_verification(client: TestClient, en
     assert any("not proof" in lim for lim in v["limits"])
 
 
+def test_general_answer_is_labelled_and_attested(client: TestClient, env: Env) -> None:
+    h = login(client, "alice", USER_PW)
+    env.llm.reply = "Hello! I can answer questions about your documents, and general questions too."
+    r = client.post("/api/chat", json={"question": "hi"}, headers=h)
+    final = sse_events(r.text)[-1]
+    assert (final["status"], final["reason"]) == ("answered", "general")
+    assert final["citations"] == []
+    assert final["answer"].startswith("Hello!")
+    v = client.get(f"/api/attestation/blocks/{final['attestation']['index']}").json()
+    assert v["block"]["outcome"] == "answered:general"
+
+
 def test_refusal_is_attested_and_break_flagged(client: TestClient, env: Env) -> None:
+    env.services.settings.general_chat = False
     h = login(client, "alice", USER_PW)
     env.net.current = CONNECTED_NET
     r = client.post("/api/chat", json={"question": "Who won the 1998 world cup?"}, headers=h)

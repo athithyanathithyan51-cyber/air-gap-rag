@@ -170,4 +170,32 @@ describe("App", () => {
     expect(await screen.findByText(/^I don't know/)).toBeInTheDocument();
     expect(screen.getByText("No sufficiently relevant passage was found in the documents.")).toBeInTheDocument();
   });
+
+  it("labels a general answer as not from the documents", async () => {
+    mockFetch((url) => {
+      if (url === "/api/auth/me") return json({ id: 1, username: "alice", role: "user" });
+      if (url === "/api/attestation/status") return json(STATUS);
+      if (url === "/api/chat")
+        return sse([
+          { type: "sources", sources: [] },
+          { type: "token", text: "Hello! How can I help?" },
+          {
+            type: "final",
+            status: "answered",
+            reason: "general",
+            answer: "Hello! How can I help?",
+            citations: [],
+            support: 0,
+            best_score: 0.1,
+            attestation: { index: 0, block_hash: "h", isolated: true, monitor_state: "ISOLATED" },
+          },
+        ]);
+      return json({}, 404);
+    });
+    render(<App />);
+    fireEvent.change(await screen.findByLabelText("Question"), { target: { value: "hi" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+    expect(await screen.findByText("Hello! How can I help?")).toBeInTheDocument();
+    expect(screen.getByText(/General answer, not from your documents/)).toBeInTheDocument();
+  });
 });

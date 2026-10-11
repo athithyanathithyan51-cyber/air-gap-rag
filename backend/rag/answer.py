@@ -2,7 +2,10 @@
 
 Flow:
 1. Embed the question, retrieve top-k chunks.
-2. If the best similarity is below `min_score`, refuse without calling the LLM.
+2. If the best similarity is below `min_score`, nothing in the documents is relevant:
+   - general chat on (default): answer from the model's own knowledge, with no citations,
+     labelled reason="general" so the UI marks it "not from your documents";
+   - general chat off: refuse without calling the LLM.
 3. Build a prompt in which document text is fenced as untrusted data.
 4. Stream the model's answer.
 5. Grounding check: the answer must cite at least one valid source [S#], and
@@ -12,6 +15,7 @@ Flow:
 
 from __future__ import annotations
 
+import logging
 import re
 import unicodedata
 from collections.abc import AsyncIterator
@@ -38,6 +42,18 @@ Rules:
 4. Do not use outside knowledge. Do not invent sources, page numbers or facts.
 5. Be concise and precise."""
 
+GENERAL_PROMPT = """You are a friendly, helpful assistant running fully offline on an air-gapped network.
+No relevant passage was found in the organisation's documents for this message, so answer from your general knowledge.
+
+Rules:
+1. Reply naturally to greetings and small talk. If asked what you can do, say you answer questions about the
+   uploaded documents with citations, and can also help with general questions.
+2. Answer general questions concisely and accurately. If you are not sure, say so; do not invent facts,
+   figures, names, sources or citations.
+3. Never claim the answer comes from the organisation's documents.
+4. If the message asks about internal or organisational matters (policies, people, rules, records), say the
+   uploaded documents do not contain that information instead of guessing."""
+
 _STOP = frozenset(
     (  # noqa: SIM905 - readable word list
         "a an the and or but if then else of to in on at by for with from as is are was were be been being this "
@@ -49,6 +65,36 @@ _STOP = frozenset(
 )
 _WORD = re.compile(r"[a-z0-9]+")
 _CITE = re.compile(r"\[S(\d{1,2})\]")
+
+# Document text that tries to give the model orders. Such chunks are never sent to the model.
+_INJECTION = re.compile(
+    r"\b(?:ignore|disregard|forget|override)\s+(?:all\s+|any\s+)?(?:(?:the|your|my|these|those)\s+)?"
+    r"(?:previous|prior|above|earlier|preceding|original|system)\s+(?:instructions?|rules|prompts?|guidelines)\b"
+    r"|\byou are now (?:in |an? |the )?\w*\s?(?:mode|assistant|admin|administrator|ai|model|bot)\b"
+    r"|\b(?:system|developer) prompt\b",
+    re.I,
+)
+# Answers that ask the user to hand over secrets (the classic phishing relay) are never shown.
+_SECRET = r"(?:passwords?|passcodes?|passphrases?|otps?|pins?|credentials?|login details)"  # noqa: S105
+_CREDENTIAL_REQUEST = re.compile(
+    r"\b(?:e-?mail|send|share|submit|provide|give|tell|reply with|forward)\b[^.\n]{0,60}\b" + _SECRET + r"\b"
+    r"|\b" + _SECRET + r"\b[^.\n]{0,40}\b(?:to|at)\s+\S+@\S+",
+    re.I,
+)
+
+log = logging.getLogger("airgap.rag")
+
+
+def looks_like_injection(text: str) -> bool:
+    return bool(_INJECTION.search(text))
+
+
+_NEGATION = re.compile(r"\b(?:never|not|don't|do not|must not|should not|shouldn't)\s+(?:\w+\s+)?$", re.I)
+
+
+def requests_credentials(text: str) -> bool:
+    # "Never share your password" is advice, not a request.
+    return any(not _NEGATION.search(text[: m.start()]) for m in _CREDENTIAL_REQUEST.finditer(text))
 
 
 @dataclass(frozen=True)
@@ -82,7 +128,9 @@ class Source:
 @dataclass
 class Verdict:
     status: str  # answered | refused
-    reason: str  # grounded | low_retrieval_score | model_declined | no_valid_citation | unsupported | llm_error
+    # grounded | general | low_retrieval_score | model_declined | no_valid_citation | unsupported
+    # | unsafe_content | llm_error
+    reason: str
     answer: str
     cited: list[Source] = field(default_factory=list)
     support: float = 0.0
@@ -113,6 +161,10 @@ def build_messages(question: str, sources: list[Source]) -> list[dict[str, str]]
         + "If they do not contain the answer, reply exactly: I don't know."
     )
     return [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": user}]
+
+
+def build_general_messages(question: str) -> list[dict[str, str]]:
+    return [{"role": "system", "content": GENERAL_PROMPT}, {"role": "user", "content": question}]
 
 
 def is_model_refusal(answer: str) -> bool:
@@ -151,6 +203,7 @@ class AnswerEngine:
         min_score: float = 0.55,
         min_support: float = 0.5,
         max_context_chars: int = 16000,
+        general_chat: bool = True,
     ) -> None:
         self.s = session
         self.store = store
@@ -160,6 +213,7 @@ class AnswerEngine:
         self.min_score = min_score
         self.min_support = min_support
         self.max_context_chars = max_context_chars
+        self.general_chat = general_chat
 
     async def retrieve(self, question: str) -> list[Source]:
         self.store.ensure_collection()
@@ -181,6 +235,9 @@ class AnswerEngine:
             if h.chunk_id not in rows:
                 continue  # stale vector for a deleted document
             c, d = rows[h.chunk_id]
+            if looks_like_injection(c.text):
+                log.warning("injection_chunk_skipped", extra={"chunk_id": c.id, "document": d.filename})
+                continue
             if sources and used + len(c.text) > self.max_context_chars:
                 break
             used += len(c.text)
@@ -207,6 +264,20 @@ class AnswerEngine:
         yield {"type": "sources", "sources": [s.public(include_text=False) for s in sources]}
         best = max((s.score for s in sources), default=0.0)
         if not sources or best < self.min_score:
+            if self.general_chat:
+                parts: list[str] = []
+                async for piece in self.llm.stream_chat(build_general_messages(question)):
+                    parts.append(piece)
+                    yield {"type": "token", "text": piece}
+                reply = "".join(parts).strip()
+                if not reply:
+                    verdict = Verdict("refused", "low_retrieval_score", REFUSAL)
+                elif requests_credentials(reply):
+                    verdict = Verdict("refused", "unsafe_content", REFUSAL)
+                else:
+                    verdict = Verdict("answered", "general", reply)
+                yield {"type": "final", "verdict": verdict, "sources": sources, "best_score": best}
+                return
             yield {
                 "type": "final",
                 "verdict": Verdict("refused", "low_retrieval_score", REFUSAL),
@@ -214,9 +285,11 @@ class AnswerEngine:
                 "best_score": best,
             }
             return
-        parts: list[str] = []
+        parts = []
         async for piece in self.llm.stream_chat(build_messages(question, sources)):
             parts.append(piece)
             yield {"type": "token", "text": piece}
         verdict = grounding_check("".join(parts), sources, self.min_support)
+        if verdict.status == "answered" and requests_credentials(verdict.answer):
+            verdict = Verdict("refused", "unsafe_content", REFUSAL, verdict.cited, verdict.support)
         yield {"type": "final", "verdict": verdict, "sources": sources, "best_score": best}
