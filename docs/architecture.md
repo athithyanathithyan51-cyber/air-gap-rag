@@ -47,4 +47,4 @@ Docker Compose runs `app`, `qdrant` and `ollama` with `network_mode: host`, each
 | In-process socket guard (`backend/app/net_guard.py`) | R1 is enforced in code, not only by the air gap. |
 | Swagger/ReDoc disabled | Both pages load JavaScript from public CDNs (R1). |
 | SQLite in WAL mode | One machine, 1–10 users; no extra server to run. |
-| `qwen2.5:7b` by default, `llama3.2:3b` as fallback | The choice between them is decided by measured p95 latency on the 16 GB floor (**untested**). |
+| `llama3.2:3b` by default (RC1), `qwen2.5:7b` optional | Measured on the demo gold set, on an i5-12450H laptop with 16 GB and CPU only (`eval/results/20261011T*`). 3B: p95 34 s, first-token p50 13 s, citation accuracy 0.946, refusal recall 0.92. 7B: p95 63 s, first-token p50 29 s, citation accuracy 1.0, refusal recall 1.0. 7B is more accurate but exceeds the 60 s p95 budget, so 3B ships for RC1. 7B, or a GPU, is the candidate default for the semester-end review. The injection filter (PR #3) covers the probe that 3B failed (i02). |

@@ -59,7 +59,8 @@ fi
 chown root:"$APP_UID" "$ETC/attestation.pass"; chmod 0440 "$ETC/attestation.pass"
 [ -f "$ETC/airgap.env" ] || cat > "$ETC/airgap.env" <<EOF
 # Edit and run: sudo docker compose -f $PREFIX/docker-compose.yml --env-file $ETC/airgap.env up -d
-AIRGAP_CHAT_MODEL=qwen2.5:7b-instruct-q4_K_M
+AIRGAP_CHAT_MODEL=llama3.2:3b-instruct-q4_K_M
+# Larger, more accurate, about 2x slower (p95 63 s on a 16 GB laptop): AIRGAP_CHAT_MODEL=qwen2.5:7b-instruct-q4_K_M
 AIRGAP_BIND_HOST=127.0.0.1
 AIRGAP_BIND_PORT=8000
 EOF

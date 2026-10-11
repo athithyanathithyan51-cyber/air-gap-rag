@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     qdrant_url: str = "http://127.0.0.1:6333"
     qdrant_collection: str = "chunks"
     ollama_url: str = "http://127.0.0.1:11434"
-    chat_model: str = "qwen2.5:7b-instruct-q4_K_M"
+    chat_model: str = "llama3.2:3b-instruct-q4_K_M"
     embed_model: str = "nomic-embed-text"
     embed_dim: int = 768
     llm_timeout_s: float = 300.0
