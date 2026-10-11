@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from ingest.pipeline import Ingestor
-from rag.answer import REFUSAL, AnswerEngine, Source, build_messages, grounding_check
+from rag.answer import GENERAL_PROMPT, REFUSAL, AnswerEngine, Source, build_messages, grounding_check
 from tests.conftest import Env
 
 DOC = b"""# Attendance
@@ -24,9 +24,11 @@ async def setup(env: Env, tmp_path: Path) -> None:
         await Ingestor(s, env.services.store, env.embedder, tmp_path, 200, 30).ingest(DOC, "policy.md", "admin")
 
 
-async def run(env: Env, question: str, min_score: float = 0.2) -> list[dict[str, Any]]:
+async def run(env: Env, question: str, min_score: float = 0.2, general_chat: bool = True) -> list[dict[str, Any]]:
     with env.services.db.session() as s:
-        engine = AnswerEngine(s, env.services.store, env.embedder, env.llm, top_k=3, min_score=min_score)
+        engine = AnswerEngine(
+            s, env.services.store, env.embedder, env.llm, top_k=3, min_score=min_score, general_chat=general_chat
+        )
         return [ev async for ev in engine.stream(question)]
 
 
@@ -81,11 +83,11 @@ async def test_answers_with_citation(env: Env, tmp_path: Path) -> None:
     assert "75 percent" in env.llm.messages[1]["content"]
 
 
-async def test_low_retrieval_score_refuses_without_llm(env: Env, tmp_path: Path) -> None:
+async def test_strict_mode_low_score_refuses_without_llm(env: Env, tmp_path: Path) -> None:
     await setup(env, tmp_path)
     env.llm.reply = "should never be called"
     env.llm.messages = []
-    events = await run(env, "quantum chromodynamics gluon lattice", min_score=0.5)
+    events = await run(env, "quantum chromodynamics gluon lattice", min_score=0.5, general_chat=False)
     final = events[-1]
     assert final["verdict"].reason == "low_retrieval_score"
     assert final["verdict"].answer == REFUSAL
@@ -93,6 +95,24 @@ async def test_low_retrieval_score_refuses_without_llm(env: Env, tmp_path: Path)
     assert not any(e["type"] == "token" for e in events)
 
 
-async def test_empty_index_refuses(env: Env) -> None:
-    events = await run(env, "anything at all?")
+async def test_low_score_general_chat_answers_without_citations(env: Env, tmp_path: Path) -> None:
+    await setup(env, tmp_path)
+    env.llm.reply = "Hello! How can I help you today?"
+    events = await run(env, "quantum chromodynamics gluon lattice", min_score=0.5)
+    final = events[-1]["verdict"]
+    assert (final.status, final.reason, final.answer) == ("answered", "general", "Hello! How can I help you today?")
+    assert final.cited == []
+    assert env.llm.messages[0]["content"] == GENERAL_PROMPT
+    assert "SOURCES" not in env.llm.messages[1]["content"]  # no document text sent in general mode
+    assert any(e["type"] == "token" for e in events)
+
+
+async def test_general_chat_empty_reply_falls_back_to_refusal(env: Env) -> None:
+    env.llm.reply = "   "
+    events = await run(env, "hi")
+    assert (events[-1]["verdict"].status, events[-1]["verdict"].answer) == ("refused", REFUSAL)
+
+
+async def test_empty_index_refuses_in_strict_mode(env: Env) -> None:
+    events = await run(env, "anything at all?", general_chat=False)
     assert events[-1]["verdict"].status == "refused"

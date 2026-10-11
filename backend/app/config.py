@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     # Default is a starting point; tuned on the gold set (eval/), value recorded in eval/results.
     min_score: float = 0.55
     max_context_chars: int = 16000
+    # Below min_score, answer from the model's own knowledge (labelled "general", no citations)
+    # instead of refusing. False restores strict documents-only mode.
+    general_chat: bool = True
 
     # --- uploads ---
     max_upload_mb: int = 50

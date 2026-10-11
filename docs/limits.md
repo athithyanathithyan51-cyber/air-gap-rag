@@ -17,6 +17,7 @@ Each line stays here until a test or measurement replaces it. The evidence file 
 - **Attestation records interface state at a moment, not all traffic.**
 - **Clock changes affect timestamps.** The monotonic counter keeps order.
 - **Docker Desktop (Windows/macOS):** attestation reflects the Docker VM, not the physical host.
+- **General answers are not grounded.** With `AIRGAP_GENERAL_CHAT=true`, questions that match no document are answered from the model's own training data. They carry no citations, can be wrong or out of date (the 3B model especially), and are labelled as such in the UI and in the attestation outcome (`answered:general`).
 - **`net_guard` scope:** it covers Python socket use in the app process only. It does not cover native code that bypasses Python's socket module, or other processes.
 - **Qdrant vectors are stored unencrypted.** Chunk-text encryption arrives in v1.0.0.
 

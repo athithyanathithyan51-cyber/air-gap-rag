@@ -91,7 +91,7 @@ export default function Chat({ me }: { me: Me }) {
                 {t.error && <p className="text-red-700">⚠ {t.error}</p>}
                 {!t.error && !t.final && (
                   <p className="whitespace-pre-wrap text-slate-700">
-                    {t.draft || <span className="text-slate-400">Searching documents…</span>}
+                    {t.draft || <span className="text-slate-400">Thinking…</span>}
                     {t.pending && <span className="animate-pulse">▍</span>}
                   </p>
                 )}
@@ -100,6 +100,11 @@ export default function Chat({ me }: { me: Me }) {
                     <p className={`whitespace-pre-wrap ${t.final.status === "refused" ? "text-slate-600 italic" : ""}`}>
                       {t.final.answer}
                     </p>
+                    {t.final.reason === "general" && (
+                      <p className="mt-2 inline-block rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs text-amber-900">
+                        General answer, not from your documents. Verify important facts.
+                      </p>
+                    )}
                     {t.final.status === "refused" && (
                       <p className="mt-1 text-xs text-slate-500">{REASONS[t.final.reason] ?? t.final.reason}</p>
                     )}

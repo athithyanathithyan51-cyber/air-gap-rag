@@ -93,12 +93,17 @@ def ask(client: httpx.Client, question: str) -> dict[str, Any]:
     return {"sources": sources, "final": final, "error": error, "ttft_s": first, "total_s": total}
 
 
+def from_documents(r: dict[str, Any]) -> bool:
+    """Answered from the documents. A "general" answer (model's own knowledge) counts as not answered."""
+    return r["status"] == "answered" and r.get("reason") != "general"
+
+
 def refusal_metrics(rows: list[dict[str, Any]], threshold: float | None = None) -> dict[str, Any]:
     tp = fp = fn = tn = 0
     for r in rows:
         if r.get("error"):
             continue
-        refused = r["status"] == "refused" or (threshold is not None and r["best_score"] < threshold)
+        refused = not from_documents(r) or (threshold is not None and r["best_score"] < threshold)
         unanswerable = not r["answerable"]
         tp += refused and unanswerable
         fp += refused and not unanswerable
@@ -156,12 +161,12 @@ def main() -> int:
             "total_s": round(res["total_s"], 3),
         }
         row["hit"] = any(matches(s, item) for s in row["retrieved"]) if row["answerable"] else None
-        if row["answerable"] and row["status"] == "answered":
+        if row["answerable"] and from_documents(row):
             row["citation_correct"] = [matches(c, item) for c in row["citations"]]
             must = [m.lower() for m in item.get("must_contain", [])]
             row["keyword_match"] = all(m in (row["answer"] or "").lower() for m in must) if must else None
         rows.append(row)
-        print(f"[{n}/{len(gold)}] {item['id']}: {row['status'] or row['error']} ({row['total_s']:.1f}s)", flush=True)
+        print(f"[{n}/{len(gold)}] {item['id']}: {row['status'] or row['error']}:{row['reason']} ({row['total_s']:.1f}s)", flush=True)
     wall = time.perf_counter() - t0
     sampler.stop_evt.set()
     sampler.join()
@@ -191,7 +196,8 @@ def main() -> int:
         "hit_rate_at_k": round(sum(hits) / len(hits), 3) if hits else None,
         "citation_accuracy": round(sum(cites) / len(cites), 3) if cites else None,
         "keyword_match_rate": round(sum(kw) / len(kw), 3) if kw else None,
-        "answered_rate_on_answerable": round(sum(r["status"] == "answered" for r in answerable) / len(answerable), 3) if answerable else None,
+        "answered_rate_on_answerable": round(sum(from_documents(r) for r in answerable) / len(answerable), 3) if answerable else None,
+        "general_answers": sum(r.get("reason") == "general" for r in rows),
         "refusal": refusal_metrics(rows),
         "threshold_sweep": sweep,
         "latency_total_s": {"p50": percentile(totals, 0.5), "p95": percentile(totals, 0.95), "mean": round(statistics.mean(totals), 3) if totals else None},
@@ -208,9 +214,9 @@ def main() -> int:
             fh.write(json.dumps(r, ensure_ascii=False) + "\n")
     with (out / "review.csv").open("w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
-        w.writerow(["id", "answerable", "status", "question", "answer", "citations", "hallucination (y/n)", "notes"])
+        w.writerow(["id", "answerable", "status", "reason", "question", "answer", "citations", "hallucination (y/n)", "notes"])
         for r in rows:
-            w.writerow([r["id"], r["answerable"], r["status"], r["question"], r["answer"],
+            w.writerow([r["id"], r["answerable"], r["status"], r["reason"], r["question"], r["answer"],
                         "; ".join(f"{c['filename']} p{c['page']}" for c in r["citations"]), "", ""])
     print(json.dumps({k: summary[k] for k in ("hit_rate_at_k", "citation_accuracy", "refusal", "latency_total_s", "host_ram_used_gb")}, indent=2))
     print(f"results: {out}")
