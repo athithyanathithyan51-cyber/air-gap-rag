@@ -34,7 +34,10 @@ export default function Chat({ me }: { me: Me }) {
   const endRef = useRef<HTMLDivElement>(null);
   const busy = turns.some((t) => t.pending);
 
-  useEffect(() => endRef.current?.scrollIntoView?.({ behavior: "smooth" }), [turns]);
+  // Block body: newer browsers return a Promise from scrollIntoView, which React would call as a cleanup.
+  useEffect(() => {
+    endRef.current?.scrollIntoView?.({ behavior: "smooth" });
+  }, [turns]);
   useEffect(() => () => abortRef.current?.abort(), []);
 
   const update = (id: number, f: (t: Turn) => Turn) => setTurns((ts) => ts.map((t) => (t.id === id ? f(t) : t)));
