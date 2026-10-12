@@ -20,8 +20,14 @@ export default function VerifyDialog({ index, onClose }: { index: number; onClos
 
   const b = result?.block;
   return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="verify-title">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-5 shadow-xl">
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="verify-title"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="scroll-thin max-h-[90vh] w-full max-w-2xl animate-fade-in overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
         <div className="mb-3 flex items-start justify-between">
           <h2 id="verify-title" className="text-lg font-semibold">
             Verify answer record #{index}
