@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     llm_timeout_s: float = 300.0
     llm_temperature: float = 0.1
     llm_num_ctx: int = 4096
-    llm_num_predict: int = 512  # caps answer length (tokens)
+    llm_num_predict: int = 320  # caps answer length (tokens); the prompts ask for 1-4 sentences
     llm_warm_up: bool = True  # load the models at startup so the first question is fast
 
     # --- retrieval / answering ---
@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     # Cosine similarity below which we refuse without calling the LLM.
     # Default is a starting point; tuned on the gold set (eval/), value recorded in eval/results.
     min_score: float = 0.55
-    max_context_chars: int = 8000
+    max_context_chars: int = 6000  # source text per question; reading the prompt dominates first-token time on CPU
     # Below min_score, answer from the model's own knowledge (labelled "general", no citations)
     # instead of refusing. False restores strict documents-only mode.
     general_chat: bool = True

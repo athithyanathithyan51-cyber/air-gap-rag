@@ -40,10 +40,13 @@ async def test_warm_up_loads_chat_and_embedding_models() -> None:
         if req.url.path == "/api/embed":
             return httpx.Response(200, json={"embeddings": [[0.0, 1.0]]})
         assert body["keep_alive"] == "30m"
+        if req.url.path == "/api/chat":
+            assert body["messages"][0] == {"role": "system", "content": "SYS"}
+            assert body["options"]["num_predict"] == 1
         return httpx.Response(200, json={"done": True})
 
-    await client_with(handler).warm_up()
-    assert paths == [("/api/generate", "chat-model"), ("/api/embed", "embed-model")]
+    await client_with(handler).warm_up(["SYS"])
+    assert paths == [("/api/generate", "chat-model"), ("/api/chat", "chat-model"), ("/api/embed", "embed-model")]
 
 
 async def test_warm_up_failure_never_breaks_startup(caplog: pytest.LogCaptureFixture) -> None:

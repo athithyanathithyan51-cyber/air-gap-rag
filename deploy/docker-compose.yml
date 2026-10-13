@@ -33,7 +33,7 @@ services:
     environment:
       OLLAMA_HOST: 127.0.0.1:11434
       OLLAMA_KEEP_ALIVE: 30m
-      OLLAMA_NUM_PARALLEL: "1"  # one KV cache: faster single answers on CPU and small GPUs
+      OLLAMA_NUM_PARALLEL: "2"  # two KV caches: grounded and general system prompts both stay cached
       OLLAMA_MAX_LOADED_MODELS: "2"
     volumes:
       - ollama_models:/root/.ollama

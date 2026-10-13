@@ -20,6 +20,7 @@ from api.deps import Services
 from app.config import Settings, get_settings
 from app.logging import configure_logging
 from app.net_guard import install_guard
+from rag.answer import GENERAL_PROMPT, SYSTEM_PROMPT
 
 log = logging.getLogger("airgap.app")
 
@@ -30,7 +31,7 @@ async def warm_up_models(llm: object) -> None:
     if warm is None:
         return
     try:
-        await warm()
+        await warm([SYSTEM_PROMPT, GENERAL_PROMPT])
         log.info("models_warm")
     except Exception as exc:  # noqa: BLE001 - any failure just means the first question loads the model
         log.warning("model_warm_up_failed", extra={"error": f"{type(exc).__name__}: {exc}"})
