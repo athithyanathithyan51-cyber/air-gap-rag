@@ -69,6 +69,7 @@ sed -i '/^AIRGAP_VERSION=/d' "$ETC/airgap.env"; echo "AIRGAP_VERSION=$VERSION" >
 
 install -d "$PREFIX"
 install -m 0644 "$HERE/deploy/docker-compose.yml" "$PREFIX/docker-compose.yml"
+install -m 0644 "$HERE/deploy/docker-compose.gpu.yml" "$PREFIX/docker-compose.gpu.yml"  # optional, see admin guide
 install -m 0644 "$HERE/tools/verify_chain.py" "$PREFIX/verify_chain.py"
 COMPOSE=(docker compose -p airgap -f "$PREFIX/docker-compose.yml" --env-file "$ETC/airgap.env")
 

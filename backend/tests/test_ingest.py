@@ -168,3 +168,17 @@ async def test_upload_limits(env: Env, tmp_path: Path) -> None:
             await ing.ingest(b"x" * 11, "a.txt", "admin")
         with pytest.raises(UploadRejectedError):
             await ing.ingest(b"\x7fELF\x00\x00", "a.txt", "admin")
+
+
+async def test_reindex_rechunks_stored_document(env: Env, tmp_path: Path) -> None:
+    text = "# Rules\n\n" + "\n\n".join(f"Rule {i}: students must submit form {i} to the office before noon." for i in range(12))
+    with env.services.db.session() as s:
+        big = ingestor(env, tmp_path, s)
+        doc = (await big.ingest(text.encode(), "rules.md", "admin")).document
+        before = doc.chunk_count
+        small = Ingestor(s, env.services.store, env.embedder, tmp_path / "docs", 60, 10)  # type: ignore[arg-type]
+        after = await small.reindex(doc, "cli")
+        assert after > before
+        assert env.services.store.count() == after
+        assert len(s.scalars(select(Chunk).where(Chunk.document_id == doc.id)).all()) == after
+        assert s.scalars(select(AuditEvent)).all()[-1].action == "document.reindexed"

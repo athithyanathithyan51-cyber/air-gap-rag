@@ -3,6 +3,7 @@
 - Dedup: a file whose SHA-256 is already ingested is not processed again.
 - Incremental re-ingest: uploading a changed file with the same filename
   replaces the old version (its chunks and vectors are removed).
+- Reindex: re-chunk stored files after the chunk settings change (`python -m app.cli reindex`).
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ from sqlalchemy.orm import Session
 from db.audit import audit
 from db.models import Chunk, Document
 from ingest.chunker import chunk_segments
-from ingest.parsers import ParseError, UnsupportedFileError, parse
+from ingest.parsers import ParseError, Segment, UnsupportedFileError, parse
 from rag.ollama import Embedder
 from rag.vectors import VectorStore
 
@@ -69,6 +70,52 @@ class Ingestor:
         self.s.delete(doc)
         self.s.commit()
 
+    async def _index(self, doc: Document, segments: list[Segment]) -> None:
+        """Chunk, store, embed and index a parsed document (no commit)."""
+        chunks = chunk_segments(segments, self.chunk_tokens, self.overlap_tokens)
+        if not chunks:
+            raise ParseError("no text chunks produced")
+        rows = [
+            Chunk(document_id=doc.id, ordinal=c.ordinal, page=c.page, section=c.section, text=c.text, sha256=c.sha256)
+            for c in chunks
+        ]
+        self.s.add_all(rows)
+        self.s.flush()
+        vectors = await self.embedder.embed_documents([c.text for c in chunks])
+        self.store.ensure_collection()
+        self.store.upsert(
+            [
+                (row.id, vec, {"document_id": doc.id, "page": row.page, "section": row.section})
+                for row, vec in zip(rows, vectors, strict=True)
+            ]
+        )
+        doc.chunk_count = len(rows)
+
+    async def reindex(self, doc: Document, actor: str) -> int:
+        """Re-chunk and re-embed a stored document with the current chunk settings. Returns the chunk count."""
+        data = (self.docs_dir / doc.sha256).read_bytes()
+        _, segments, _ = parse(data, doc.filename, self.max_pdf_pages)
+        old = doc.chunk_count
+        self.store.delete_document(doc.id)
+        doc.chunks.clear()
+        self.s.flush()
+        try:
+            await self._index(doc, segments)
+            self.s.commit()
+        except Exception:
+            self.s.rollback()
+            raise
+        audit(
+            self.s,
+            actor,
+            "document.reindexed",
+            document_id=doc.id,
+            filename=doc.filename,
+            chunks=doc.chunk_count,
+            previous_chunks=old,
+        )
+        return doc.chunk_count
+
     async def ingest(self, data: bytes, filename: str, actor: str) -> IngestResult:
         filename = _safe_name(filename)
         if len(data) == 0:
@@ -103,26 +150,7 @@ class Ingestor:
         self.s.add(doc)
         self.s.commit()
         try:
-            chunks = chunk_segments(segments, self.chunk_tokens, self.overlap_tokens)
-            if not chunks:
-                raise ParseError("no text chunks produced")
-            rows = [
-                Chunk(
-                    document_id=doc.id, ordinal=c.ordinal, page=c.page, section=c.section, text=c.text, sha256=c.sha256
-                )
-                for c in chunks
-            ]
-            self.s.add_all(rows)
-            self.s.flush()
-            vectors = await self.embedder.embed_documents([c.text for c in chunks])
-            self.store.ensure_collection()
-            self.store.upsert(
-                [
-                    (row.id, vec, {"document_id": doc.id, "page": row.page, "section": row.section})
-                    for row, vec in zip(rows, vectors, strict=True)
-                ]
-            )
-            doc.chunk_count = len(rows)
+            await self._index(doc, segments)
             doc.status = "ready"
             self.s.commit()
             self.docs_dir.mkdir(parents=True, exist_ok=True)

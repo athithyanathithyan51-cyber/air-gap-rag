@@ -69,6 +69,16 @@ def matches(src: dict[str, Any], item: dict[str, Any]) -> bool:
 
 
 def ask(client: httpx.Client, question: str) -> dict[str, Any]:
+    """Ask once; on HTTP 429 (the server's chat rate limit) wait and retry. Latency is from the answered attempt."""
+    for _ in range(24):
+        r = _ask_once(client, question)
+        if r.get("error") != "HTTP 429":
+            return r
+        time.sleep(5)
+    return r
+
+
+def _ask_once(client: httpx.Client, question: str) -> dict[str, Any]:
     start = time.perf_counter()
     first: float | None = None
     sources: list[dict[str, Any]] = []

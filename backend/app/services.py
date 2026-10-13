@@ -32,6 +32,7 @@ def build_services(settings: Settings) -> Services:
         settings.llm_timeout_s,
         settings.llm_temperature,
         settings.llm_num_ctx,
+        settings.llm_num_predict,
     )
     store = VectorStore.connect(settings.qdrant_url, settings.qdrant_collection, settings.embed_dim)
     secret = load_or_create_secret(settings.jwt_secret_file or settings.keys_dir / "jwt.secret")

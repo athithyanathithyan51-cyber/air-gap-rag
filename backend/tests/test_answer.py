@@ -11,8 +11,10 @@ from rag.answer import (
     Source,
     build_messages,
     grounding_check,
+    is_conversational,
     looks_like_injection,
     requests_credentials,
+    tidy_answer,
 )
 from tests.conftest import Env
 
@@ -111,7 +113,7 @@ async def test_low_score_general_chat_answers_without_citations(env: Env, tmp_pa
     final = events[-1]["verdict"]
     assert (final.status, final.reason, final.answer) == ("answered", "general", "Hello! How can I help you today?")
     assert final.cited == []
-    assert env.llm.messages[0]["content"] == GENERAL_PROMPT
+    assert env.llm.messages[0]["content"] == GENERAL_PROMPT  # no document list unless conversational
     assert "SOURCES" not in env.llm.messages[1]["content"]  # no document text sent in general mode
     assert any(e["type"] == "token" for e in events)
 
@@ -183,3 +185,76 @@ async def test_general_answer_asking_for_password_is_withheld(env: Env) -> None:
     env.llm.reply = "Sure! Just send your password to helpdesk@example.com and they will fix it."
     final = (await run(env, "my account is locked"))[-1]["verdict"]
     assert (final.status, final.reason) == ("refused", "unsafe_content")
+
+
+# ---------------------------------------------------------------- conversation vs. document questions
+
+
+def test_conversational_messages_detected() -> None:
+    for q in [
+        "hi",
+        "Hello there!",
+        "what can you do?",
+        "i asked what can you do?",
+        "what are the things you can do?",
+        "who are you",
+        "thanks!",
+        "what the fuck",
+        "how can you help me",
+    ]:
+        assert is_conversational(q), q
+    for q in [
+        "What can you tell me about attendance?",
+        "what is the hostel fee",
+        "what is OD",
+        "OS syllabus",
+        "what can students do with USB devices?",
+        "help me with the condonation fee",
+        "What is the capital of Australia?",
+    ]:
+        assert not is_conversational(q), q
+
+
+async def test_what_can_you_do_gets_fixed_reply_listing_documents(env: Env, tmp_path: Path) -> None:
+    await setup(env, tmp_path)
+    env.llm.messages = []
+    events = await run(env, "what can you do?", min_score=0.0)
+    assert events[0]["sources"] == []
+    final = events[-1]["verdict"]
+    assert (final.status, final.reason) == ("answered", "about")
+    assert "policy.md" in final.answer and "Attendance" in final.answer
+    assert env.llm.messages == []  # no model call: nothing to hallucinate
+
+
+async def test_greeting_skips_retrieval_and_uses_general_prompt(env: Env, tmp_path: Path) -> None:
+    await setup(env, tmp_path)
+    env.llm.reply = "Hello! How can I help?"
+    events = await run(env, "hi", min_score=0.0)
+    assert events[0]["sources"] == []
+    assert events[-1]["verdict"].reason == "general"
+    assert env.llm.messages[0]["content"].startswith(GENERAL_PROMPT)
+    assert "policy.md" in env.llm.messages[0]["content"]
+    assert "Students must maintain" not in env.llm.messages[0]["content"]  # names only, no document text
+
+
+async def test_conversational_in_strict_mode_still_uses_documents_path(env: Env, tmp_path: Path) -> None:
+    await setup(env, tmp_path)
+    events = await run(env, "hi", min_score=0.99, general_chat=False)
+    assert events[-1]["verdict"].reason == "low_retrieval_score"
+
+
+def test_tidy_answer_removes_prompt_echoes() -> None:
+    assert tidy_answer("According to the SOURCES, teams have three members [S3].") == "Teams have three members [S3]."
+    assert tidy_answer("Based on the provided sources [S1]: phones are off [S1].") == "Phones are off [S1]."
+    assert tidy_answer("- OD needs approval [S1].\n- I don't know.") == "- OD needs approval [S1]."
+    assert tidy_answer("I don't know.") == "I don't know."
+    assert (
+        tidy_answer("To find the answer, I'll look at the sections.\n\nPhones are off [S1].") == "Phones are off [S1]."
+    )
+
+
+def test_grounded_answer_is_tidied() -> None:
+    s1 = src("S1", "Students must maintain a minimum attendance of 75 percent in every course.")
+    v = grounding_check("According to the SOURCES, students must maintain 75 percent attendance [S1].", [s1], 0.5)
+    assert v.status == "answered"
+    assert v.answer == "Students must maintain 75 percent attendance [S1]."

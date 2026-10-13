@@ -75,7 +75,7 @@ describe("App", () => {
     fireEvent.change(screen.getByLabelText("Username"), { target: { value: "alice" } });
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "secret-password" } });
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
-    expect(await screen.findByText("● ISOLATED")).toBeInTheDocument();
+    expect(await screen.findByText("ISOLATED")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Admin" })).not.toBeInTheDocument();
     expect(fetchMock.mock.calls.every(([u]) => String(u).startsWith("/"))).toBe(true);
   });
@@ -130,7 +130,9 @@ describe("App", () => {
     expect(await screen.findByRole("button", { name: "Admin" })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Question"), { target: { value: "What attendance is required?" } });
     fireEvent.click(screen.getByRole("button", { name: "Ask" }));
-    expect(await screen.findByText("Students need 75% attendance [S1].")).toBeInTheDocument();
+    expect(await screen.findByText(/Students need 75% attendance/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Source S1" })).toBeInTheDocument();
+    expect(screen.getByText("From your documents")).toBeInTheDocument();
     expect(chatHeaders?.get("X-CSRF-Token")).toBe("tok123");
 
     fireEvent.click(screen.getByRole("button", { name: /\[S1\] policy\.pdf · p\. 4 · Attendance/ }));
@@ -197,5 +199,38 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Ask" }));
     expect(await screen.findByText("Hello! How can I help?")).toBeInTheDocument();
     expect(screen.getByText(/General answer, not from your documents/)).toBeInTheDocument();
+  });
+
+  it("keeps the conversation when switching tabs and sends on Enter", async () => {
+    mockFetch((url) => {
+      if (url === "/api/auth/me") return json({ id: 1, username: "alice", role: "user" });
+      if (url === "/api/attestation/status") return json(STATUS);
+      if (url === "/api/documents") return json([]);
+      if (url === "/api/chat")
+        return sse([
+          { type: "sources", sources: [] },
+          {
+            type: "final",
+            status: "answered",
+            reason: "general",
+            answer: "Steps:\n- first\n- second",
+            citations: [],
+            support: 0,
+            best_score: 0.1,
+            attestation: { index: 0, block_hash: "h", isolated: true, monitor_state: "ISOLATED" },
+          },
+        ]);
+      return json({}, 404);
+    });
+    render(<App />);
+    const box = await screen.findByLabelText("Question");
+    fireEvent.change(box, { target: { value: "list steps" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(await screen.findByText("first")).toBeInTheDocument();
+    expect(screen.getByText("second").tagName).toBe("LI");
+    fireEvent.click(screen.getByRole("button", { name: "Documents" }));
+    expect(await screen.findByText(/No documents yet/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Chat" }));
+    expect(screen.getByText("list steps")).toBeInTheDocument();
   });
 });

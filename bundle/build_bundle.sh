@@ -67,7 +67,7 @@ docker run --rm -v "$MODELS_VOLUME:/src:ro" -v "$OUT/models:/out" --entrypoint t
   -C /src -cf /out/ollama-models.tar models
 
 log "Scripts, configuration, docs"
-cp "$ROOT/deploy/docker-compose.yml" "$OUT/deploy/"
+cp "$ROOT/deploy/docker-compose.yml" "$ROOT/deploy/docker-compose.gpu.yml" "$OUT/deploy/"
 cp "$ROOT/deploy/install.sh" "$ROOT/deploy/uninstall.sh" "$ROOT/deploy/rollback.sh" "$OUT/"
 cp "$ROOT/backend/attestation/verify_chain.py" "$OUT/tools/"
 cp "$ROOT/scripts/verify_isolation.py" "$ROOT/scripts/capture_traffic.sh" "$OUT/scripts/"

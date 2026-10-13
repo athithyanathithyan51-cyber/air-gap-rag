@@ -2,23 +2,27 @@
 
 python -m app.cli create-user NAME [--role admin|user]   (password read from prompt or stdin)
 python -m app.cli export-chain OUT.jsonl                 (plus OUT.pub with the public key)
+python -m app.cli reindex                                (re-chunk all documents with the current chunk settings)
 """
 
 from __future__ import annotations
 
 import argparse
+import asyncio
 import getpass
 import sys
 from pathlib import Path
 
 from sqlalchemy import select
 
-from app.config import get_settings
+from app.config import Settings, get_settings
+from app.services import build_services
 from attestation.keys import PUBLIC_FILE
 from auth.security import hash_password
 from db.audit import audit
-from db.models import AttestationBlock, User
+from db.models import AttestationBlock, Document, User
 from db.session import Database
+from ingest.pipeline import Ingestor
 
 
 def _read_password() -> str:
@@ -30,6 +34,22 @@ def _read_password() -> str:
     return pw
 
 
+async def _reindex(settings: Settings) -> int:
+    svc = build_services(settings)
+    with svc.db.session() as s:
+        ing = Ingestor(
+            s, svc.store, svc.embedder, settings.docs_dir, settings.chunk_tokens, settings.chunk_overlap_tokens,
+            settings.max_upload_mb * 1024 * 1024, settings.max_pdf_pages,
+        )
+        docs = s.scalars(select(Document).where(Document.status == "ready").order_by(Document.filename)).all()
+        for d in docs:
+            old = d.chunk_count
+            new = await ing.reindex(d, "cli")
+            print(f"{d.filename}: {old} -> {new} chunks")
+    print(f"reindexed {len(docs)} documents (chunk_tokens={settings.chunk_tokens})")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m app.cli")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -38,9 +58,12 @@ def main(argv: list[str] | None = None) -> int:
     cu.add_argument("--role", choices=["admin", "user"], default="user")
     ex = sub.add_parser("export-chain")
     ex.add_argument("out", type=Path)
+    sub.add_parser("reindex")
     args = ap.parse_args(argv)
 
     settings = get_settings()
+    if args.cmd == "reindex":
+        return asyncio.run(_reindex(settings))
     db = Database(settings.db_path)
     with db.session() as s:
         if args.cmd == "create-user":

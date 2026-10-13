@@ -33,16 +33,18 @@ class Settings(BaseSettings):
     embed_dim: int = 768
     llm_timeout_s: float = 300.0
     llm_temperature: float = 0.1
-    llm_num_ctx: int = 8192
+    llm_num_ctx: int = 4096
+    llm_num_predict: int = 320  # caps answer length (tokens); the prompts ask for 1-4 sentences
+    llm_warm_up: bool = True  # load the models at startup so the first question is fast
 
     # --- retrieval / answering ---
-    chunk_tokens: int = 800
-    chunk_overlap_tokens: int = 100
-    top_k: int = 5
+    chunk_tokens: int = 400  # smaller chunks: shorter prompts on CPU; change, then run `python -m app.cli reindex`
+    chunk_overlap_tokens: int = 60
+    top_k: int = 3  # demo gold set: hit@3 = hit@5 = 37/37; fewer chunks = shorter prompt
     # Cosine similarity below which we refuse without calling the LLM.
     # Default is a starting point; tuned on the gold set (eval/), value recorded in eval/results.
     min_score: float = 0.55
-    max_context_chars: int = 16000
+    max_context_chars: int = 6000  # source text per question; reading the prompt dominates first-token time on CPU
     # Below min_score, answer from the model's own knowledge (labelled "general", no citations)
     # instead of refusing. False restores strict documents-only mode.
     general_chat: bool = True

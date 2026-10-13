@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager
@@ -19,8 +20,22 @@ from api.deps import Services
 from app.config import Settings, get_settings
 from app.logging import configure_logging
 from app.net_guard import install_guard
+from rag.answer import GENERAL_PROMPT, SYSTEM_PROMPT
 
 log = logging.getLogger("airgap.app")
+
+
+async def warm_up_models(llm: object) -> None:
+    """Best effort: load the models in the background; never blocks or breaks startup."""
+    warm = getattr(llm, "warm_up", None)
+    if warm is None:
+        return
+    try:
+        await warm([SYSTEM_PROMPT, GENERAL_PROMPT])
+        log.info("models_warm")
+    except Exception as exc:  # noqa: BLE001 - any failure just means the first question loads the model
+        log.warning("model_warm_up_failed", extra={"error": f"{type(exc).__name__}: {exc}"})
+
 
 APP_VERSION = "0.1.0"
 
@@ -113,8 +128,11 @@ def create_app(
             install_guard([*settings.net_allowed_hosts, *_service_hosts(settings)])
         if settings.monitor_enabled:
             svc.monitor.start()
+        warm_task = asyncio.create_task(warm_up_models(svc.llm)) if settings.llm_warm_up else None
         log.info("startup", extra={"version": APP_VERSION, "environment": settings.environment})
         yield
+        if warm_task is not None and not warm_task.done():
+            warm_task.cancel()
         svc.monitor.stop()
         log.info("shutdown")
 

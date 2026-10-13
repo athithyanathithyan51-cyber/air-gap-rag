@@ -51,7 +51,7 @@ micromamba run -n airgap python -m app.main      # http://127.0.0.1:8000/health
 conda-lock lock --micromamba -f environment.yml -p linux-64 -p win-64 --lockfile conda-lock.yml
 
 # model services for local development (Qdrant + Ollama on 127.0.0.1)
-docker compose -f deploy/docker-compose.dev.yml up -d
+docker compose -f deploy/docker-compose.dev.yml up -d   # uses the NVIDIA GPU if Docker sees one (check: ollama ps)
 docker exec airgap-dev-ollama-1 ollama pull nomic-embed-text
 docker exec airgap-dev-ollama-1 ollama pull llama3.2:3b-instruct-q4_K_M
 docker exec airgap-dev-ollama-1 ollama pull qwen2.5:7b-instruct-q4_K_M   # optional, larger model
