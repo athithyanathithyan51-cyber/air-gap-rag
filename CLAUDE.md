@@ -50,7 +50,7 @@ RC1 scope cuts, moved to v1.0.0:
 
 ## HARD REQUIREMENTS
 1. Zero network calls at runtime: no telemetry, no CDN assets, no downloads after install.
-2. Answers come only from ingested documents, with citations (document and page/section). Below the confidence threshold, reply "I don't know".
+2. Answers come only from ingested documents, with citations (document and page/section). Below the confidence threshold, refuse (a templated "not in the documents" reply, never model-invented content).
 3. Installs on a clean air-gapped machine from one transfer bundle, following the README alone.
 4. Multi-user login with roles (admin, user), secure sessions, encryption at rest and an audit log.
 5. Isolation attestation on every answer.

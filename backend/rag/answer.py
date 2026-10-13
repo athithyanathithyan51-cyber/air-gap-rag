@@ -19,6 +19,7 @@ Flow:
 from __future__ import annotations
 
 import logging
+import random
 import re
 import unicodedata
 from collections.abc import AsyncIterator
@@ -32,6 +33,7 @@ from db.models import Chunk, Document
 from rag.ollama import ChatModel, Embedder
 from rag.vectors import VectorStore
 
+# Placeholder verdict text. AnswerEngine.stream() replaces it with refusal_reply() before the answer is shown.
 REFUSAL = "I don't know. The ingested documents do not contain enough information to answer this."
 
 SYSTEM_PROMPT = """You are a document assistant on an air-gapped network.
@@ -227,6 +229,94 @@ def about_reply(documents: list[tuple[str, list[str]]]) -> str:
     return "\n".join(lines)
 
 
+# Refusal wording. Built from templates, never by the model, so a refusal cannot invent content.
+# Each slot avoids repeating its previous choice, so consecutive refusals read differently.
+_rng = random.Random()  # noqa: S311 - wording variety, not security
+_last_pick: dict[str, int] = {}
+
+_OPENERS = (
+    "I couldn't find {topic} in the loaded documents.",
+    "I searched the loaded documents but couldn't find {topic} anywhere in them.",
+    "I checked the documents available to me and couldn't locate {topic} in any of them.",
+    "I wasn't able to locate {topic} in the current document set.",
+    "I'm unable to find {topic} in the documents I have access to.",
+)
+_RELATED_UNCLEAR = (
+    "The closest related passage is in {where}, but it doesn't state this clearly enough for a reliable answer.",
+    "{where} touches on a related topic, but not in enough detail to answer this accurately.",
+    "The nearest match was in {where}, though it doesn't directly address this question.",
+)
+_RELATED_SEE = (
+    "The most closely related material is in {where}, which may still be worth a look.",
+    "You may find related information in {where}.",
+    "The nearest related content is in {where}.",
+)
+_CLOSERS = (
+    "You could try rephrasing with the exact term the documents use.",
+    "If this should be covered, an administrator can upload the relevant document on the Documents page.",
+    "Try asking about a specific section, or ask an administrator to add a document that covers this.",
+)
+_UNSAFE = (
+    "I can't help with that request. I never pass on requests for passwords, OTPs or other credentials;"
+    " please contact your IT administrator through an official channel.",
+    "For your security, I won't relay instructions to share passwords or other credentials."
+    " If you need access, please reach your IT administrator directly.",
+    "That request involves sharing credentials, so I've withheld the answer."
+    " Legitimate staff will never ask for your password; please check with your IT administrator.",
+)
+_CHAT_FALLBACK = (
+    "Sorry, I couldn't put together a reply just now. Could you rephrase, or ask me about the loaded documents?",
+    "I didn't manage a proper reply to that. Feel free to try again, or ask a question about your documents.",
+)
+_TOPIC_LEAD = re.compile(
+    r"^(?:(?:what|who|which)\s+(?:is|are|was|were)|tell\s+me\s+about|explain|describe|define"
+    r"|(?:details?|information|info)\s+(?:of|about|on))\s+(.+)$",
+    re.I,
+)
+_MARKDOWN = re.compile(r"[*_`#<>\[\]]")
+_MAX_TOPIC = 100
+
+
+def _pick(slot: str, options: tuple[str, ...]) -> str:
+    choices = [i for i in range(len(options)) if i != _last_pick.get(slot)] or [0]
+    i = _rng.choice(choices)
+    _last_pick[slot] = i
+    return options[i]
+
+
+def _topic(question: str) -> str:
+    q = re.sub(r"\s+", " ", _MARKDOWN.sub("", question)).strip().rstrip("?.! ")
+    q = re.sub(r"\s+(?:please|pls)$", "", q, flags=re.I)
+    m = _TOPIC_LEAD.match(q)
+    if m and len(m.group(1)) <= _MAX_TOPIC:
+        return f"information on {m.group(1)}"
+    if len(q) > _MAX_TOPIC:
+        q = q[:_MAX_TOPIC].rsplit(" ", 1)[0] + "…"
+    return f"an answer to “{q}?”" if not q.endswith("…") else f"an answer to “{q}”"
+
+
+def _where(s: Source) -> str:
+    return f"**{s.filename}**" + (f" (page {s.page})" if s.page is not None else "")
+
+
+def refusal_reply(question: str, reason: str, related: list[Source]) -> str:
+    """Professional, specific refusal text. `related` are retrieved sources relevant enough to mention."""
+    if reason == "unsafe_content":
+        return _pick("unsafe", _UNSAFE)
+    if is_conversational(question):
+        return _pick("chat", _CHAT_FALLBACK)
+    parts = [_pick("open", _OPENERS).format(topic=_topic(question))]
+    if related:
+        where = _where(related[0])
+        if reason in ("unsupported", "no_valid_citation"):
+            sentence = _pick("unclear", _RELATED_UNCLEAR).format(where=where)
+        else:
+            sentence = _pick("see", _RELATED_SEE).format(where=where)
+        parts.append(sentence[:1].upper() + sentence[1:])
+    parts.append(_pick("close", _CLOSERS))
+    return " ".join(parts)
+
+
 # Prompt echoes the model sometimes produces: "According to the SOURCES, ...".
 _SOURCE_LEAD = re.compile(
     r"^(?:according\s+to|based\s+on|as\s+per|from|per)\s+(?:the\s+)?(?:provided\s+|given\s+|above\s+|supplied\s+)?"
@@ -412,7 +502,18 @@ class AnswerEngine:
         return out
 
     async def stream(self, question: str) -> AsyncIterator[dict[str, Any]]:
-        """Yields events: sources, token*, final. The final event carries the Verdict."""
+        """Yields events: sources, token*, final. The final event carries the Verdict.
+        A refusal's placeholder text is replaced here with a specific, varied reply."""
+        async for ev in self._stream(question):
+            if ev["type"] == "final" and ev["verdict"].status == "refused":
+                v: Verdict = ev["verdict"]
+                # Mention a document only if retrieval found it relevant; cited sources come first.
+                relevant = [s for s in ev["sources"] if s.score >= self.min_score]
+                related = v.cited + [s for s in relevant if s not in v.cited]
+                v.answer = refusal_reply(normalize(question), v.reason, related)
+            yield ev
+
+    async def _stream(self, question: str) -> AsyncIterator[dict[str, Any]]:
         question = normalize(question)
         kind = classify_message(question) if self.general_chat else "document"
         if kind == "about":

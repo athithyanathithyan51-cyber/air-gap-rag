@@ -10,7 +10,7 @@ All commands assume the following alias:
 | `/ready` returns 503 for `ollama` | `ag logs ollama`; `ag exec ollama ollama list` | Model missing: re-run `install.sh` (it restores the weights). Not enough RAM: switch to the 3B model (admin guide §5) |
 | `/ready` returns 503 for `qdrant` | `ag logs qdrant` | Disk full? Run `df -h /var/lib/docker`. Free space, then `ag restart qdrant` |
 | Chat says "local language model is unavailable" | Ollama is down or timed out | `ag restart ollama`; the first answer after a restart loads the model and is slow |
-| Every answer is "I don't know" | Admin → Documents: are they `ready` with chunks above 0? | Re-upload. Scanned PDFs have no text (OCR comes in v1.0.0). `AIRGAP_MIN_SCORE` may be too high |
+| Every answer says the documents do not cover it | Admin → Documents: are they `ready` with chunks above 0? | Re-upload. Scanned PDFs have no text (OCR comes in v1.0.0). `AIRGAP_MIN_SCORE` may be too high |
 | Upload rejected (415) | The message says why: corrupt PDF, encrypted PDF, unsupported type | Re-export the file as PDF or DOCX |
 | Badge shows NOT ISOLATED | Admin → Isolation attestation shows the reasons (`ip -br link`, `ip route`) | Disconnect or disable the interface or default route, then **Acknowledge** |
 | Login always fails after a password reset | Rate limit: 10 attempts per minute per client | Wait one minute |

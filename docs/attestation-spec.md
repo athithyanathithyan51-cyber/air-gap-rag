@@ -16,7 +16,7 @@ Every answer appends one block. Blocks are serialised as canonical JSON: UTF-8, 
 | `counter` | int | Monotonic counter persisted on disk; strictly +1 per block, never reset |
 | `query_hash` | hex | SHA-256 of the user's question (NFC-normalised UTF-8) |
 | `chunk_hashes` | [hex] | SHA-256 of each retrieved chunk's text, in rank order |
-| `answer_hash` | hex | SHA-256 of the final answer text (the refusal text for "I don't know") |
+| `answer_hash` | hex | SHA-256 of the final answer text (for a refusal, the templated "not in the documents" reply actually shown) |
 | `outcome` | string | `answered:grounded` or `refused:<reason>` |
 | `citations` | [object] | `{doc_id, doc_sha256, page, section}` for each cited source |
 | `net` | object | Network snapshot (below) |
