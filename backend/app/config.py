@@ -38,8 +38,8 @@ class Settings(BaseSettings):
     llm_warm_up: bool = True  # load the models at startup so the first question is fast
 
     # --- retrieval / answering ---
-    chunk_tokens: int = 800
-    chunk_overlap_tokens: int = 100
+    chunk_tokens: int = 400  # smaller chunks: shorter prompts on CPU; change, then run `python -m app.cli reindex`
+    chunk_overlap_tokens: int = 60
     top_k: int = 3  # demo gold set: hit@3 = hit@5 = 37/37; fewer chunks = shorter prompt
     # Cosine similarity below which we refuse without calling the LLM.
     # Default is a starting point; tuned on the gold set (eval/), value recorded in eval/results.
