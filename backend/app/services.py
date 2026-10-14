@@ -12,6 +12,7 @@ from attestation.chain import Attestor
 from attestation.keys import load_or_create, resolve_passphrase
 from attestation.monitor import IsolationMonitor
 from attestation.netsnap import snapshot
+from attestation.traffic import TrafficMeter
 from auth.security import TokenService, hash_password, load_or_create_secret
 from db.audit import audit
 from db.models import User
@@ -38,7 +39,7 @@ def build_services(settings: Settings) -> Services:
     secret = load_or_create_secret(settings.jwt_secret_file or settings.keys_dir / "jwt.secret")
     tokens = TokenService(secret, settings.access_token_minutes, settings.refresh_token_days)
     policy = {"mode": settings.isolation_mode, "allow": list(settings.isolation_allow)}
-    monitor = IsolationMonitor(db.factory, snapshot, policy, settings.monitor_interval_s)
+    monitor = IsolationMonitor(db.factory, snapshot, policy, settings.monitor_interval_s, TrafficMeter())
     passphrase = resolve_passphrase(
         settings.attestation_passphrase, settings.attestation_passphrase_file, settings.keys_dir, settings.environment
     )

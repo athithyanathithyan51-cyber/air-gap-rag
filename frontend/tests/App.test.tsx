@@ -28,6 +28,15 @@ const STATUS = {
   last_check: null,
   current_reasons: [],
   isolated_now: true,
+  traffic: {
+    since: "2026-10-14T06:41:00+00:00",
+    sent_bytes: 0,
+    recv_bytes: 0,
+    sent_packets: 0,
+    recv_packets: 0,
+    interfaces: ["Wi-Fi", "Ethernet"],
+    app_remote_sockets: [] as string[],
+  },
   policy: { mode: "strict", allow: ["docker0"] },
   blocks: 0,
   key_id: "k",
@@ -99,10 +108,28 @@ describe("App", () => {
       return json({}, 404);
     });
     render(<App />);
-    const badge = await screen.findByRole("button", { name: /ISOLATED.*acknowledge break/ });
-    fireEvent.click(badge);
-    await waitFor(() => expect(screen.queryByRole("button", { name: /acknowledge break/ })).not.toBeInTheDocument());
-    expect(screen.getByText("ISOLATED")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: /ISOLATED.*break pending ack/ }));
+    const panel = screen.getByRole("dialog", { name: "Network isolation" });
+    expect(within(panel).getByTestId("traffic-Sent")).toHaveTextContent("0 B");
+    expect(within(panel).getByTestId("traffic-Received")).toHaveTextContent("0 B");
+    expect(within(panel).getByText(/App connections to non-local addresses/)).toHaveTextContent(": 0");
+    fireEvent.click(within(panel).getByRole("button", { name: "Acknowledge break" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Acknowledge break" })).not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "ISOLATED" })).toBeInTheDocument();
+  });
+
+  it("shows traffic in red if anything leaked", async () => {
+    mockFetch((url) => {
+      if (url === "/api/auth/me") return json({ id: 1, username: "alice", role: "user" });
+      if (url === "/api/attestation/status")
+        return json({ ...STATUS, traffic: { ...STATUS.traffic, sent_bytes: 2048, sent_packets: 3, app_remote_sockets: ["8.8.8.8:53"] } });
+      return json({}, 404);
+    });
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "ISOLATED" }));
+    expect(screen.getByTestId("traffic-Sent")).toHaveTextContent("2.0 KB");
+    expect(screen.getByTestId("traffic-Sent")).toHaveClass("text-red-700");
+    expect(screen.getByText(/8\.8\.8\.8:53/)).toBeInTheDocument();
   });
 
   it("shows NOT ISOLATED while the machine is online", async () => {
