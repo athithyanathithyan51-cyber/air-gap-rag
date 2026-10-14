@@ -30,7 +30,7 @@ flowchart LR
 ## Request flow: answering a question
 1. The UI sends a `POST /api/chat`. The JWT and CSRF token are checked, and the rate limit applies.
 2. The app embeds the question with `nomic-embed-text` via Ollama, then runs a top-k search in Qdrant.
-3. If the best score is below the refusal threshold, the answer is "I don't know". The model is not called.
+3. If the best score is below the refusal threshold, the answer is a refusal: a templated reply that names the question and, where relevant, the closest document (`refusal_reply` in `backend/rag/answer.py`, wording varies each time). The model is not called.
 4. Otherwise the prompt is built. Chunks are inserted as delimited, untrusted data with chunk IDs, and the model is told to answer only from them and to cite the IDs.
 5. The answer streams back over SSE.
 6. A grounding check runs: every cited ID must be among the retrieved chunks, and the answer must cite at least one.

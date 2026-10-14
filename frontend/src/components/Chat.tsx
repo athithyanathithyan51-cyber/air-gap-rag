@@ -35,7 +35,7 @@ type Turn = {
 const REASONS: Record<string, string> = {
   grounded: "Answer is supported by the cited sources.",
   low_retrieval_score: "No sufficiently relevant passage was found in the documents.",
-  model_declined: "The model found no answer in the retrieved passages.",
+  model_declined: "The retrieved passages did not contain the answer.",
   no_valid_citation: "The draft answer did not cite a retrieved source, so it was withheld.",
   unsupported: "The draft answer was not supported by its cited sources, so it was withheld.",
   unsafe_content: "The draft answer asked for a password or other credentials, so it was withheld.",

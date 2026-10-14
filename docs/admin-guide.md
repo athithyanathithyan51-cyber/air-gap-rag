@@ -61,8 +61,8 @@ sudo ./install.sh
 | Variable | Default | Meaning |
 |---|---|---|
 | `AIRGAP_CHAT_MODEL` | `llama3.2:3b-instruct-q4_K_M` | `qwen2.5:7b-instruct-q4_K_M` gives better citations and resists prompt injection better, but is about 2x slower (p95 63 s vs 34 s on an i5-12450H / 16 GB laptop). Use it on machines with more than 16 GB RAM or a GPU |
-| `AIRGAP_MIN_SCORE` | `0.55` | Retrieval similarity below which the answer is "I don't know" without calling the model. Tune it with `eval/run_eval.py` |
-| `AIRGAP_GENERAL_CHAT` | `true` | Below `AIRGAP_MIN_SCORE`, answer greetings and general questions from the model's own knowledge, labelled "General answer, not from your documents". Set `false` for strict documents-only mode ("I don't know") |
+| `AIRGAP_MIN_SCORE` | `0.55` | Retrieval similarity below which the question is refused ("not in the documents") without calling the model. Tune it with `eval/run_eval.py` |
+| `AIRGAP_GENERAL_CHAT` | `true` | Below `AIRGAP_MIN_SCORE`, answer greetings and general questions from the model's own knowledge, labelled "General answer, not from your documents". Set `false` for strict documents-only mode (refusals only) |
 | `AIRGAP_TOP_K` | `3` | Passages retrieved per question. Fewer passages make a shorter prompt and a faster answer. On the demo set, 3 finds the right document as often as 5 |
 | `AIRGAP_MAX_CONTEXT_CHARS` | `8000` | Maximum document text sent to the model per question |
 | `AIRGAP_LLM_NUM_CTX` | `4096` | Model context window, in tokens. Larger uses more RAM/VRAM and is slower |

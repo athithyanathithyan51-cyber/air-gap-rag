@@ -138,7 +138,7 @@ def test_refusal_is_attested_and_break_flagged(client: TestClient, env: Env) -> 
     env.net.current = CONNECTED_NET
     r = client.post("/api/chat", json={"question": "Who won the 1998 world cup?"}, headers=h)
     final = sse_events(r.text)[-1]
-    assert final["status"] == "refused" and final["answer"].startswith("I don't know")
+    assert final["status"] == "refused" and "1998 world cup" in final["answer"]
     assert final["attestation"]["isolated"] is False
     assert final["attestation"]["monitor_state"] == "NOT-ISOLATED"
     assert client.get("/api/attestation/status").json()["state"] == "NOT-ISOLATED"

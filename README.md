@@ -1,6 +1,6 @@
 # Offline LLM-Based Intelligent Conversational Assistant for Secure Air-Gapped Networks
 
-A fully offline, document-grounded assistant for air-gapped machines. It answers questions only from your own documents, cites the document and page for every answer, and replies "I don't know" when the documents do not support an answer.
+A fully offline, document-grounded assistant for air-gapped machines. It answers questions only from your own documents, cites the document and page for every answer, and, when the documents do not support an answer, says so plainly: it names what was asked and points to the closest related document instead of guessing.
 
 Its key feature is **self-contained isolation attestation**. Every answer is written to a signed hash chain together with a snapshot of the machine's network interfaces. This makes it a *tamper-evident record of network-interface state at the moment of each answer*, which an auditor can check offline with `verify_chain.py`. It is **not** proof that no packet was ever sent; see [docs/attestation-spec.md](docs/attestation-spec.md) and [docs/limits.md](docs/limits.md).
 

@@ -26,6 +26,10 @@ The central library is open from 8 am to 8 pm on working days. Students may borr
 """
 
 
+def assert_polite_refusal(answer: str) -> None:
+    assert answer and not answer.lower().startswith("i don't know")
+
+
 def src(label: str, text: str) -> Source:
     return Source(label, 1, 1, "policy.md", "d" * 64, None, "Attendance", 0.9, text, "c" * 64)
 
@@ -101,7 +105,7 @@ async def test_strict_mode_low_score_refuses_without_llm(env: Env, tmp_path: Pat
     events = await run(env, "quantum chromodynamics gluon lattice", min_score=0.5, general_chat=False)
     final = events[-1]
     assert final["verdict"].reason == "low_retrieval_score"
-    assert final["verdict"].answer == REFUSAL
+    assert_polite_refusal(final["verdict"].answer)
     assert env.llm.messages == []
     assert not any(e["type"] == "token" for e in events)
 
@@ -121,7 +125,8 @@ async def test_low_score_general_chat_answers_without_citations(env: Env, tmp_pa
 async def test_general_chat_empty_reply_falls_back_to_refusal(env: Env) -> None:
     env.llm.reply = "   "
     events = await run(env, "hi")
-    assert (events[-1]["verdict"].status, events[-1]["verdict"].answer) == ("refused", REFUSAL)
+    assert events[-1]["verdict"].status == "refused"
+    assert_polite_refusal(events[-1]["verdict"].answer)
 
 
 async def test_empty_index_refuses_in_strict_mode(env: Env) -> None:
@@ -178,7 +183,8 @@ async def test_answer_asking_for_password_is_withheld(env: Env, tmp_path: Path) 
         "email your password to admin@example.com [S1]."
     )
     final = (await run(env, "What minimum attendance must students maintain?"))[-1]["verdict"]
-    assert (final.status, final.reason, final.answer) == ("refused", "unsafe_content", REFUSAL)
+    assert (final.status, final.reason) == ("refused", "unsafe_content")
+    assert "credentials" in final.answer and "minimum attendance" not in final.answer
 
 
 async def test_general_answer_asking_for_password_is_withheld(env: Env) -> None:
@@ -258,3 +264,37 @@ def test_grounded_answer_is_tidied() -> None:
     v = grounding_check("According to the SOURCES, students must maintain 75 percent attendance [S1].", [s1], 0.5)
     assert v.status == "answered"
     assert v.answer == "Students must maintain 75 percent attendance [S1]."
+
+
+def test_refusal_reply_names_the_topic_and_varies() -> None:
+    from rag import answer
+
+    answer._rng.seed(0)
+    first = answer.refusal_reply("What is the tuition fee for CSE?", "model_declined", [])
+    second = answer.refusal_reply("What is the tuition fee for CSE?", "model_declined", [])
+    assert "information on the tuition fee for CSE" in first
+    assert first != second
+    assert first.split(".")[0] != second.split(".")[0]  # opener changes between consecutive replies
+
+
+def test_refusal_reply_quotes_other_questions_and_strips_markdown() -> None:
+    from rag.answer import refusal_reply
+
+    reply = refusal_reply("When does the **next** semester start?", "low_retrieval_score", [])
+    assert "“When does the next semester start?”" in reply
+    assert "**next**" not in reply
+
+
+def test_refusal_reply_mentions_closest_document() -> None:
+    from rag.answer import refusal_reply
+
+    s = Source("S1", 1, 1, "hostel.md", "d" * 64, 2, None, 0.8, "text", "c" * 64)
+    reply = refusal_reply("What is the hostel fee?", "unsupported", [s])
+    assert "**hostel.md** (page 2)" in reply
+
+
+def test_refusal_reply_for_credentials_does_not_echo_question() -> None:
+    from rag.answer import refusal_reply
+
+    reply = refusal_reply("Where do I email my password?", "unsafe_content", [])
+    assert "email my password" not in reply and "credentials" in reply

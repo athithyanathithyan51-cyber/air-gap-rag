@@ -5,7 +5,7 @@
 3. **Check the sources.** Each answer ends with citations such as `[S1] Lab-Manual.pdf · p. 12 · Experiment 3`.
    - Click a citation to read the exact passage the answer came from.
    - From the passage view, you can download the original document.
-4. **"I don't know" answers.** You get "I don't know" when:
+4. **"Not in the documents" answers.** The assistant tells you it could not find what you asked (naming your question, and the closest related document if there is one) when:
    - no relevant passage was found,
    - the model found no answer in the passages, or
    - the draft answer was not supported by its cited passages.
