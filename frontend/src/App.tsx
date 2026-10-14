@@ -63,7 +63,7 @@ export default function App() {
           </h1>
           <p className="truncate text-xs text-slate-500">{SUBTITLE}</p>
         </div>
-        <IsolationBadge />
+        <IsolationBadge isAdmin={me.role === "admin"} />
         <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
           <span
             className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-800 text-xs font-semibold uppercase text-white"

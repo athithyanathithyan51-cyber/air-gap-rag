@@ -117,6 +117,17 @@ def test_isolation_break_latches_until_acknowledged(env: Env) -> None:
     assert r.valid and r.first_not_isolated == 2 and r.not_isolated_count == 2 and r.exit_code == 2
 
 
+def test_status_reports_live_verdict_alongside_latch(env: Env) -> None:
+    mon, net = env.services.monitor, env.net
+    net.current = CONNECTED_NET
+    mon.check_once()
+    assert mon.status()["state"] == "NOT-ISOLATED" and mon.status()["isolated_now"] is False
+    net.current = ISOLATED_NET  # internet cut: live verdict recovers, latch holds until acknowledged
+    mon.check_once()
+    s = mon.status()
+    assert s["state"] == "NOT-ISOLATED" and s["isolated_now"] is True and s["current_reasons"] == []
+
+
 def test_monitor_thread_detects_break(env: Env) -> None:
     import time
 

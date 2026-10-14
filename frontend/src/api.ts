@@ -168,6 +168,7 @@ export type AttestationStatus = {
   break: { ts_utc: string; reasons: string[] } | null;
   last_check: string | null;
   current_reasons: string[];
+  isolated_now: boolean | null;
   policy: { mode: string; allow: string[] };
   blocks: number;
   key_id: string;

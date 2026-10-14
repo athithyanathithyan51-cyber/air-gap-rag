@@ -47,6 +47,7 @@ class IsolationMonitor:
         self._thread: threading.Thread | None = None
         self.last_check: str | None = None
         self.last_reasons: list[str] = []
+        self.last_isolated: bool | None = None
         with self._sf() as s:
             row = s.get(KV, STATE_KEY)
             self._state = json.loads(row.value) if row else {"state": ISOLATED, "break": None}
@@ -65,6 +66,8 @@ class IsolationMonitor:
                 "break": self._state.get("break"),
                 "last_check": self.last_check,
                 "current_reasons": list(self.last_reasons),
+                # Live verdict of the latest check; "state" stays latched until an admin acknowledges.
+                "isolated_now": self.last_isolated,
                 "policy": self.policy,
                 "interval_s": self.interval_s,
             }
@@ -87,6 +90,7 @@ class IsolationMonitor:
         with self._lock:
             self.last_check = now
             self.last_reasons = reasons
+            self.last_isolated = isolated
             newly_broken = not isolated and self._state["state"] == ISOLATED
             if newly_broken:
                 self._state = {"state": NOT_ISOLATED, "break": {"ts_utc": now, "reasons": reasons}}
