@@ -17,6 +17,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session, sessionmaker
 
+from attestation.traffic import TrafficMeter
 from attestation.verify_chain import evaluate_isolation
 from db.audit import audit
 from db.models import KV
@@ -37,11 +38,13 @@ class IsolationMonitor:
         snapshotter: Snapshotter,
         policy: dict[str, Any],
         interval_s: float = 1.0,
+        traffic: TrafficMeter | None = None,
     ) -> None:
         self._sf = session_factory
         self._snap = snapshotter
         self.policy = policy
         self.interval_s = interval_s
+        self.traffic = traffic
         self._lock = threading.Lock()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -70,6 +73,7 @@ class IsolationMonitor:
                 "isolated_now": self.last_isolated,
                 "policy": self.policy,
                 "interval_s": self.interval_s,
+                "traffic": self.traffic.status() if self.traffic else None,
             }
 
     def _persist(self, s: Session) -> None:
@@ -86,6 +90,8 @@ class IsolationMonitor:
     def check_once(self) -> tuple[dict[str, Any], bool, list[str]]:
         net = self._snap()
         isolated, reasons = evaluate_isolation(net, self.policy)
+        if self.traffic is not None:
+            self.traffic.update(net, isolated, list(self.policy.get("allow", [])))
         now = datetime.now(UTC).isoformat(timespec="milliseconds")
         with self._lock:
             self.last_check = now
