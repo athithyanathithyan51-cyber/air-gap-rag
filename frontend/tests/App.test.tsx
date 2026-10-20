@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "../src/App";
 import { TITLE } from "../src/constants";
@@ -27,6 +27,16 @@ const STATUS = {
   break: null,
   last_check: null,
   current_reasons: [],
+  isolated_now: true,
+  traffic: {
+    since: "2026-10-14T06:41:00+00:00",
+    sent_bytes: 0,
+    recv_bytes: 0,
+    sent_packets: 0,
+    recv_packets: 0,
+    interfaces: ["Wi-Fi", "Ethernet"],
+    app_remote_sockets: [] as string[],
+  },
   policy: { mode: "strict", allow: ["docker0"] },
   blocks: 0,
   key_id: "k",
@@ -78,6 +88,59 @@ describe("App", () => {
     expect(await screen.findByText("ISOLATED")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Admin" })).not.toBeInTheDocument();
     expect(fetchMock.mock.calls.every(([u]) => String(u).startsWith("/"))).toBe(true);
+  });
+
+  it("shows the live isolation state and lets an admin acknowledge a past break from the badge", async () => {
+    document.cookie = "airgap_csrf=tok123";
+    let status: Omit<typeof STATUS, "break"> & { break: { ts_utc: string; reasons: string[] } | null } = {
+      ...STATUS,
+      state: "NOT-ISOLATED",
+      isolated_now: true,
+      break: { ts_utc: "2026-10-14T06:40:00Z", reasons: ["physical interface Wi-Fi is up"] },
+    };
+    mockFetch((url) => {
+      if (url === "/api/auth/me") return json({ id: 2, username: "admin", role: "admin" });
+      if (url === "/api/attestation/status") return json(status);
+      if (url === "/api/attestation/acknowledge") {
+        status = { ...status, state: "ISOLATED", break: null };
+        return json(status);
+      }
+      return json({}, 404);
+    });
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: /ISOLATED.*break pending ack/ }));
+    const panel = screen.getByRole("dialog", { name: "Network isolation" });
+    expect(within(panel).getByTestId("traffic-Sent")).toHaveTextContent("0 B");
+    expect(within(panel).getByTestId("traffic-Received")).toHaveTextContent("0 B");
+    expect(within(panel).getByText(/App connections to non-local addresses/)).toHaveTextContent(": 0");
+    fireEvent.click(within(panel).getByRole("button", { name: "Acknowledge break" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Acknowledge break" })).not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "ISOLATED" })).toBeInTheDocument();
+  });
+
+  it("shows traffic in red if anything leaked", async () => {
+    mockFetch((url) => {
+      if (url === "/api/auth/me") return json({ id: 1, username: "alice", role: "user" });
+      if (url === "/api/attestation/status")
+        return json({ ...STATUS, traffic: { ...STATUS.traffic, sent_bytes: 2048, sent_packets: 3, app_remote_sockets: ["8.8.8.8:53"] } });
+      return json({}, 404);
+    });
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "ISOLATED" }));
+    expect(screen.getByTestId("traffic-Sent")).toHaveTextContent("2.0 KB");
+    expect(screen.getByTestId("traffic-Sent")).toHaveClass("text-red-700");
+    expect(screen.getByText(/8\.8\.8\.8:53/)).toBeInTheDocument();
+  });
+
+  it("shows NOT ISOLATED while the machine is online", async () => {
+    mockFetch((url) => {
+      if (url === "/api/auth/me") return json({ id: 1, username: "alice", role: "user" });
+      if (url === "/api/attestation/status")
+        return json({ ...STATUS, state: "NOT-ISOLATED", isolated_now: false, current_reasons: ["IPv4 default route present"] });
+      return json({}, 404);
+    });
+    render(<App />);
+    expect(await screen.findByText("NOT ISOLATED")).toBeInTheDocument();
   });
 
   it("streams an answer with citations and verifies it", async () => {

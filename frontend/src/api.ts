@@ -163,11 +163,23 @@ export const api = {
   },
 };
 
+export type TrafficStatus = {
+  since: string | null;
+  sent_bytes: number;
+  recv_bytes: number;
+  sent_packets: number;
+  recv_packets: number;
+  interfaces: string[];
+  app_remote_sockets: string[];
+};
+
 export type AttestationStatus = {
   state: "ISOLATED" | "NOT-ISOLATED";
   break: { ts_utc: string; reasons: string[] } | null;
   last_check: string | null;
   current_reasons: string[];
+  isolated_now: boolean | null;
+  traffic: TrafficStatus | null;
   policy: { mode: string; allow: string[] };
   blocks: number;
   key_id: string;
