@@ -77,6 +77,9 @@ class Settings(BaseSettings):
 
     ready_timeout_s: float = 2.0
 
+    # Prometheus text metrics at /metrics. Off by default: the endpoint has no login.
+    metrics_enabled: bool = False
+
     @property
     def db_path(self) -> Path:
         return self.data_dir / "airgap.db"
