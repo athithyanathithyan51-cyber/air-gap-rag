@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.main import create_app
@@ -9,7 +10,7 @@ from app.metrics import Registry
 from tests.conftest import make_services, make_settings
 
 
-def _app(tmp_path: Path, enabled: bool):  # noqa: ANN202 - test helper
+def _app(tmp_path: Path, enabled: bool) -> FastAPI:
     settings = make_settings(tmp_path).model_copy(update={"metrics_enabled": enabled})
     return create_app(
         settings,

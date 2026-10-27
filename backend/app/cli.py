@@ -38,8 +38,14 @@ async def _reindex(settings: Settings) -> int:
     svc = build_services(settings)
     with svc.db.session() as s:
         ing = Ingestor(
-            s, svc.store, svc.embedder, settings.docs_dir, settings.chunk_tokens, settings.chunk_overlap_tokens,
-            settings.max_upload_mb * 1024 * 1024, settings.max_pdf_pages,
+            s,
+            svc.store,
+            svc.embedder,
+            settings.docs_dir,
+            settings.chunk_tokens,
+            settings.chunk_overlap_tokens,
+            settings.max_upload_mb * 1024 * 1024,
+            settings.max_pdf_pages,
         )
         docs = s.scalars(select(Document).where(Document.status == "ready").order_by(Document.filename)).all()
         for d in docs:

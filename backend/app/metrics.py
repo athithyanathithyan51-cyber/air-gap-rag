@@ -53,10 +53,10 @@ class Registry:
             for key in sorted(self._buckets):
                 for bound, n in zip(BUCKETS, self._buckets[key], strict=True):
                     lines.append(
-                        f"airgap_http_request_duration_seconds_bucket{_labels(key + (('le', str(bound)),))} {n}"
+                        f"airgap_http_request_duration_seconds_bucket{_labels((*key, ('le', str(bound))))} {n}"
                     )
                 lines.append(
-                    f"airgap_http_request_duration_seconds_bucket{_labels(key + (('le', '+Inf'),))} {self._count[key]}"
+                    f"airgap_http_request_duration_seconds_bucket{_labels((*key, ('le', '+Inf')))} {self._count[key]}"
                 )
                 lines.append(f"airgap_http_request_duration_seconds_sum{_labels(key)} {self._sum[key]:.6f}")
                 lines.append(f"airgap_http_request_duration_seconds_count{_labels(key)} {self._count[key]}")
