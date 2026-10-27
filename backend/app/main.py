@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -19,6 +20,7 @@ from api import admin_routes, attestation_routes, auth_routes, chat_routes, docu
 from api.deps import Services
 from app.config import Settings, get_settings
 from app.logging import configure_logging
+from app.metrics import Registry
 from app.net_guard import install_guard
 from rag.answer import GENERAL_PROMPT, SYSTEM_PROMPT
 
@@ -158,6 +160,27 @@ def create_app(
         if request.url.path.startswith("/api/") or request.url.path in ("/health", "/ready"):
             response.headers["Cache-Control"] = "no-store"
         return response
+
+    registry = Registry()
+    app.state.metrics = registry
+
+    if settings.metrics_enabled:
+
+        @app.middleware("http")
+        async def record_metrics(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+            started = time.perf_counter()
+            response = await call_next(request)
+            # Label by route template, not raw path, so IDs in URLs do not explode the series count.
+            matched = request.scope.get("route")
+            route = getattr(matched, "path", "unmatched")
+            registry.observe_request(request.method, route, response.status_code, time.perf_counter() - started)
+            return response
+
+        @app.get("/metrics", tags=["ops"], include_in_schema=False)
+        async def metrics() -> Response:
+            return Response(
+                registry.render(), media_type="text/plain; version=0.0.4", headers={"Cache-Control": "no-store"}
+            )
 
     @app.get("/health", tags=["ops"])
     async def health() -> dict[str, str]:

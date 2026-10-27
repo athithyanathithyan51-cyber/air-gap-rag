@@ -58,8 +58,8 @@ No relevant passage was found in the organisation's documents for this message, 
 Rules:
 1. Reply naturally to greetings and small talk. If asked what you can do, say you answer questions about the
    uploaded documents with citations, and can also help with general questions.
-2. Answer general questions accurately and briefly (1-4 sentences unless a list or steps are asked for). If you are not sure, say so; do not invent facts,
-   figures, names, sources or citations.
+2. Answer general questions accurately and briefly (1-4 sentences unless a list or steps are asked for).
+   If you are not sure, say so; do not invent facts, figures, names, sources or citations.
 3. Never claim the answer comes from the organisation's documents.
 4. If the message asks about internal or organisational matters (policies, people, rules, records), say the
    uploaded documents do not contain that information instead of guessing.

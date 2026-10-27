@@ -68,6 +68,7 @@ sudo ./install.sh
 | `AIRGAP_LLM_NUM_CTX` | `4096` | Model context window, in tokens. Larger uses more RAM/VRAM and is slower |
 | `AIRGAP_LLM_NUM_PREDICT` | `512` | Maximum answer length, in tokens |
 | `AIRGAP_LLM_WARM_UP` | `true` | Load the models at startup, so the first question does not wait 30–40 s for them |
+| `AIRGAP_METRICS_ENABLED` | `false` | Serve Prometheus text metrics at `/metrics`: request counts and latency by route template. The endpoint has no login, so turn it on only for a local scraper |
 | `AIRGAP_BIND_HOST` | `127.0.0.1` | Keep this on loopback. Exposing it on a LAN needs TLS (v1.0.0) and LAN isolation mode |
 
 Apply changes with:

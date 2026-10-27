@@ -24,7 +24,6 @@ Each line stays here until a test or measurement replaces it. The evidence file 
 ## Deferred from RC1 to v1.0.0
 - Local TLS CA
 - nftables enforcement
-- Prometheus metrics
 - bge-reranker
 - Encryption at rest
 - systemd install
