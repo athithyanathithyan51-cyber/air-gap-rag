@@ -1,0 +1,180 @@
+{
+  "label": "demo-llama3.2-3b-laptop-gpu-current",
+  "timestamp_utc": "20261020T100650Z",
+  "base": "http://127.0.0.1:8000",
+  "host": {
+    "platform": "Windows-10-10.0.26300-SP0",
+    "cpus": 12,
+    "ram_gb": 15.7
+  },
+  "ready": {
+    "status": "ready",
+    "checks": {
+      "qdrant": {
+        "ok": true,
+        "detail": "HTTP 200"
+      },
+      "ollama": {
+        "ok": true,
+        "detail": "models present"
+      }
+    }
+  },
+  "documents": [
+    {
+      "filename": "DEMO-Data-Structures-Lab-Manual.pdf",
+      "chunks": 6,
+      "status": "ready"
+    },
+    {
+      "filename": "DEMO-Department-Academic-Policy.docx",
+      "chunks": 7,
+      "status": "ready"
+    },
+    {
+      "filename": "DEMO-Hostel-Notice.md",
+      "chunks": 4,
+      "status": "ready"
+    },
+    {
+      "filename": "DEMO-Lab-Usage-Policy.txt",
+      "chunks": 1,
+      "status": "ready"
+    },
+    {
+      "filename": "DEMO-Semester5-Syllabus.md",
+      "chunks": 10,
+      "status": "ready"
+    }
+  ],
+  "questions": 50,
+  "answerable": 37,
+  "unanswerable": 13,
+  "errors": 0,
+  "hit_rate_at_k": 1.0,
+  "citation_accuracy": 1.0,
+  "keyword_match_rate": 0.944,
+  "answered_rate_on_answerable": 0.973,
+  "general_answers": 2,
+  "refusal": {
+    "tp": 13,
+    "fp": 1,
+    "fn": 0,
+    "tn": 36,
+    "precision": 0.9285714285714286,
+    "recall": 1.0,
+    "false_refusal_rate": 0.02702702702702703
+  },
+  "threshold_sweep": {
+    "0.40": {
+      "tp": 13,
+      "fp": 1,
+      "fn": 0,
+      "tn": 36,
+      "precision": 0.9285714285714286,
+      "recall": 1.0,
+      "false_refusal_rate": 0.02702702702702703
+    },
+    "0.45": {
+      "tp": 13,
+      "fp": 1,
+      "fn": 0,
+      "tn": 36,
+      "precision": 0.9285714285714286,
+      "recall": 1.0,
+      "false_refusal_rate": 0.02702702702702703
+    },
+    "0.50": {
+      "tp": 13,
+      "fp": 1,
+      "fn": 0,
+      "tn": 36,
+      "precision": 0.9285714285714286,
+      "recall": 1.0,
+      "false_refusal_rate": 0.02702702702702703
+    },
+    "0.55": {
+      "tp": 13,
+      "fp": 1,
+      "fn": 0,
+      "tn": 36,
+      "precision": 0.9285714285714286,
+      "recall": 1.0,
+      "false_refusal_rate": 0.02702702702702703
+    },
+    "0.60": {
+      "tp": 13,
+      "fp": 1,
+      "fn": 0,
+      "tn": 36,
+      "precision": 0.9285714285714286,
+      "recall": 1.0,
+      "false_refusal_rate": 0.02702702702702703
+    },
+    "0.65": {
+      "tp": 13,
+      "fp": 3,
+      "fn": 0,
+      "tn": 34,
+      "precision": 0.8125,
+      "recall": 1.0,
+      "false_refusal_rate": 0.08108108108108109
+    },
+    "0.70": {
+      "tp": 13,
+      "fp": 8,
+      "fn": 0,
+      "tn": 29,
+      "precision": 0.6190476190476191,
+      "recall": 1.0,
+      "false_refusal_rate": 0.21621621621621623
+    },
+    "0.75": {
+      "tp": 13,
+      "fp": 15,
+      "fn": 0,
+      "tn": 22,
+      "precision": 0.4642857142857143,
+      "recall": 1.0,
+      "false_refusal_rate": 0.40540540540540543
+    },
+    "0.80": {
+      "tp": 13,
+      "fp": 25,
+      "fn": 0,
+      "tn": 12,
+      "precision": 0.34210526315789475,
+      "recall": 1.0,
+      "false_refusal_rate": 0.6756756756756757
+    },
+    "0.85": {
+      "tp": 13,
+      "fp": 34,
+      "fn": 0,
+      "tn": 3,
+      "precision": 0.2765957446808511,
+      "recall": 1.0,
+      "false_refusal_rate": 0.918918918918919
+    }
+  },
+  "latency_total_s": {
+    "p50": 1.099,
+    "p95": 4.57,
+    "mean": 3.544
+  },
+  "latency_first_token_s": {
+    "p50": 0.338,
+    "p95": 3.711
+  },
+  "host_ram_used_gb": {
+    "peak": 15.68,
+    "mean": 15.14
+  },
+  "host_cpu_percent": {
+    "peak": 81.3,
+    "mean": 32.6
+  },
+  "wall_clock_s": 202.4,
+  "all_blocks_isolated": false,
+  "hallucination_rate": "not measured by this script: fill review.csv manually"
+}
