@@ -16,7 +16,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from api import admin_routes, attestation_routes, auth_routes, chat_routes, document_routes
+from api import admin_routes, attestation_routes, auth_routes, chat_routes, document_routes, traffic_routes
 from api.deps import Services
 from app.config import Settings, get_settings
 from app.logging import configure_logging
@@ -149,7 +149,7 @@ def create_app(
     )
 
     app.state.services = svc
-    for r in (auth_routes, document_routes, chat_routes, attestation_routes, admin_routes):
+    for r in (auth_routes, document_routes, chat_routes, attestation_routes, admin_routes, traffic_routes):
         app.include_router(r.router)
 
     @app.middleware("http")

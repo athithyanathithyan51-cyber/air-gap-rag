@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { api, type Citation, type ChunkInfo, type FinalEvent, type Me } from "../api";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { api, type Citation, type ChunkInfo, type DocumentInfo, type FinalEvent, type Me } from "../api";
+import { citedSentences, findEvidence } from "../evidence";
 import AnswerText from "./AnswerText";
+import BrandMark from "./BrandMark";
 import {
   AlertIcon,
   BookIcon,
@@ -21,6 +23,7 @@ import VerifyDialog from "./VerifyDialog";
 type Turn = {
   id: number;
   question: string;
+  scope: string | null; // filename the question was limited to, or null for all documents
   draft: string;
   sources?: Citation[];
   final?: FinalEvent;
@@ -157,8 +160,17 @@ export default function Chat({ me }: { me: Me }) {
   const [question, setQuestion] = useState("");
   const [chunk, setChunk] = useState<ChunkInfo | null>(null);
   const [chunkLabel, setChunkLabel] = useState("");
+  const [chunkAnswer, setChunkAnswer] = useState("");
   const [chunkError, setChunkError] = useState("");
+  // The passage sentence the cited answer sentence was drawn from, when one is close enough.
+  const evidence = useMemo(
+    () => (chunk && chunkAnswer ? findEvidence(chunk.text, citedSentences(chunkAnswer, chunkLabel)) : null),
+    [chunk, chunkAnswer, chunkLabel],
+  );
   const [verifyIndex, setVerifyIndex] = useState<number | null>(null);
+  const [docs, setDocs] = useState<DocumentInfo[]>([]);
+  const [reportState, setReportState] = useState<"idle" | "busy" | "saved" | "failed">("idle");
+  const [scope, setScope] = useState<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -169,6 +181,13 @@ export default function Chat({ me }: { me: Me }) {
     endRef.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
   }, [turns]);
   useEffect(() => () => abortRef.current?.abort(), []);
+  // Documents that can be searched; a failed list just leaves the picker on "All documents".
+  useEffect(() => {
+    api
+      .documents()
+      .then((all) => setDocs(all.filter((d) => d.status === "ready")))
+      .catch(() => setDocs([]));
+  }, []);
 
   // Grow the question box with its content, up to a limit.
   useEffect(() => {
@@ -185,11 +204,12 @@ export default function Chat({ me }: { me: Me }) {
     if (q.length < 2 || busy) return;
     const id = clock();
     setQuestion("");
-    setTurns((ts) => [...ts, { id, question: q, draft: "", pending: true, startedAt: clock() }]);
+    const scopeName = scope === null ? null : (docs.find((d) => d.id === scope)?.filename ?? null);
+    setTurns((ts) => [...ts, { id, question: q, scope: scopeName, draft: "", pending: true, startedAt: clock() }]);
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     try {
-      for await (const ev of api.chat(q, ctrl.signal)) {
+      for await (const ev of api.chat(q, ctrl.signal, scope)) {
         if (ev.type === "sources") update(id, (t) => ({ ...t, sources: ev.sources }));
         else if (ev.type === "token") update(id, (t) => ({ ...t, draft: t.draft + ev.text, firstTokenAt: t.firstTokenAt ?? clock() }));
         else if (ev.type === "final") update(id, (t) => ({ ...t, final: ev, pending: false, endedAt: clock() }));
@@ -204,6 +224,26 @@ export default function Chat({ me }: { me: Me }) {
     }
   }
 
+  // Downloads a signed JSON report of this session's answers and their isolation records.
+  async function exportReport() {
+    const indexes = turns.flatMap((t) => (t.final ? [t.final.attestation.index] : []));
+    if (indexes.length === 0) return;
+    setReportState("busy");
+    try {
+      const report = await api.attestationReport(indexes);
+      const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: "application/json" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `attestation-report-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setReportState("saved");
+    } catch {
+      setReportState("failed");
+    }
+    window.setTimeout(() => setReportState("idle"), 2000);
+  }
+
   function ask(e: FormEvent) {
     e.preventDefault();
     void send(question);
@@ -216,9 +256,10 @@ export default function Chat({ me }: { me: Me }) {
     }
   }
 
-  async function openCitation(c: Citation) {
+  async function openCitation(c: Citation, answer: string) {
     setChunkError("");
     setChunkLabel(c.label);
+    setChunkAnswer(answer);
     try {
       setChunk(await api.chunk(c.chunk_id));
     } catch (err) {
@@ -247,10 +288,10 @@ export default function Chat({ me }: { me: Me }) {
         <div className="scroll-thin flex-1 overflow-y-auto px-4 py-6" aria-live="polite">
           {turns.length === 0 && (
             <div className="mx-auto mt-6 max-w-3xl animate-fade-in text-center sm:mt-12">
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-800 text-3xl text-white shadow-lg shadow-brand-500/30">
-                <ShieldIcon />
-              </div>
-              <h2 className="text-2xl font-semibold tracking-tight">Hello {me.username}, what would you like to know?</h2>
+              <BrandMark className="mx-auto mb-5 h-14 w-14" />
+              <h2 className="font-display text-3xl leading-tight text-brand-900">
+                Hello {me.username}, what would you like to know?
+              </h2>
               <p className="mx-auto mt-2 max-w-xl text-sm text-slate-500">
                 Questions about your documents are answered with clickable sources. Anything else gets a clearly labelled
                 general answer. Everything runs on this machine, with no internet.
@@ -261,9 +302,9 @@ export default function Chat({ me }: { me: Me }) {
                     key={s.question}
                     type="button"
                     onClick={() => void send(s.question)}
-                    className="group rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-md"
+                    className="group rounded-md border border-slate-200 bg-white p-4 text-left transition hover:border-brand-300"
                   >
-                    <span className="text-xs font-semibold uppercase tracking-wide text-brand-600">{s.label}</span>
+                    <span className="text-xs font-medium text-brand-600">{s.label}</span>
                     <span className="mt-1 block text-sm text-slate-800">{s.question}</span>
                     <span className="mt-2 block text-xs text-slate-400 group-hover:text-slate-500">{s.hint} →</span>
                   </button>
@@ -274,16 +315,15 @@ export default function Chat({ me }: { me: Me }) {
 
           {turns.map((t) => (
             <article key={t.id} className="mx-auto mb-8 max-w-3xl animate-fade-in">
-              <div className="mb-3 flex justify-end">
-                <p className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-brand-700 px-4 py-2.5 text-white shadow-sm">
+              <div className="mb-3 flex flex-col items-end gap-1">
+                {t.scope && <p className="max-w-[85%] truncate text-xs text-slate-500">Searching in {t.scope}</p>}
+                <p className="max-w-[85%] whitespace-pre-wrap rounded-md bg-brand-700 px-4 py-2.5 text-white shadow-sm">
                   {t.question}
                 </p>
               </div>
               <div className="flex gap-3">
-                <div className="mt-1 hidden h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-800 text-white sm:flex">
-                  <ShieldIcon />
-                </div>
-                <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md border border-slate-200 bg-white p-4 shadow-sm">
+                <BrandMark className="mt-1 hidden h-8 w-8 shrink-0 sm:block" />
+                <div className="min-w-0 flex-1 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
                   {t.error && (
                     <div className="flex flex-wrap items-center gap-3 text-red-700">
                       <AlertIcon className="shrink-0" />
@@ -303,7 +343,7 @@ export default function Chat({ me }: { me: Me }) {
                     <>
                       {t.draft && (
                         <div className="mb-2 text-slate-800">
-                          <AnswerText text={t.draft} citations={t.sources} onCite={(c) => void openCitation(c)} />
+                          <AnswerText text={t.draft} citations={t.sources} onCite={(c) => void openCitation(c, t.draft)} />
                         </div>
                       )}
                       {t.pending && <Progress t={t} />}
@@ -329,7 +369,7 @@ export default function Chat({ me }: { me: Me }) {
                         <OutcomeBadge f={t.final} />
                       </div>
                       <div className={t.final.status === "refused" ? "text-slate-600" : "text-slate-800"}>
-                        <AnswerText text={t.final.answer} citations={t.final.citations} onCite={(c) => void openCitation(c)} />
+                        <AnswerText text={t.final.answer} citations={t.final.citations} onCite={(c) => void openCitation(c, t.final!.answer)} />
                       </div>
                       {t.final.reason === "general" && (
                         <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
@@ -341,13 +381,13 @@ export default function Chat({ me }: { me: Me }) {
                       )}
                       {t.final.citations.length > 0 && (
                         <div className="mt-4">
-                          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Sources</p>
+                          <p className="mb-2 text-xs font-medium text-slate-500">Sources</p>
                           <div className="flex flex-wrap gap-2">
                             {t.final.citations.map((c) => (
                               <button
                                 key={c.label}
                                 type="button"
-                                onClick={() => void openCitation(c)}
+                                onClick={() => void openCitation(c, t.final!.answer)}
                                 aria-label={`[${c.label}] ${location(c)}`}
                                 className={`flex max-w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-xs transition hover:border-brand-300 hover:bg-brand-50 ${chunkLabel === c.label && chunk?.chunk_id === c.chunk_id ? "border-brand-300 bg-brand-50" : "border-slate-200 bg-slate-50"}`}
                                 title="Show the cited passage"
@@ -383,7 +423,7 @@ export default function Chat({ me }: { me: Me }) {
                             </span>
                           )}
                           <span
-                            className={t.final.attestation.isolated && t.final.attestation.monitor_state === "ISOLATED" ? "text-emerald-700" : "text-red-700"}
+                            className={`font-mono text-[11px] ${t.final.attestation.isolated && t.final.attestation.monitor_state === "ISOLATED" ? "text-emerald-700" : "text-red-700"}`}
                             title="Network-isolation state recorded with this answer"
                           >
                             Record #{t.final.attestation.index}:{" "}
@@ -402,7 +442,7 @@ export default function Chat({ me }: { me: Me }) {
 
         <form onSubmit={ask} className="border-t border-slate-200 bg-white/80 px-3 pb-3 pt-3 backdrop-blur">
           <div className="mx-auto max-w-3xl">
-            <div className="flex items-end gap-2 rounded-2xl border border-slate-300 bg-white p-2 shadow-sm transition focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-100">
+            <div className="flex items-end gap-2 rounded-xl border border-slate-300 bg-white p-2 shadow-[0_12px_40px_-12px_rgb(0_0_0/0.6)] transition focus-within:border-brand-500 focus-within:shadow-[0_0_0_3px_rgb(47_179_166/0.18),0_12px_40px_-12px_rgb(0_0_0/0.6)]">
               {turns.length > 0 && (
                 <button
                   type="button"
@@ -419,6 +459,39 @@ export default function Chat({ me }: { me: Me }) {
                   <PlusIcon />
                 </button>
               )}
+              {turns.some((t) => t.final) && (
+                <button
+                  type="button"
+                  onClick={() => void exportReport()}
+                  disabled={busy || reportState === "busy"}
+                  title="Download a signed report of this session's answers"
+                  className="mb-0.5 inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 text-xs text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 disabled:opacity-40"
+                >
+                  <ShieldIcon />
+                  {reportState === "busy"
+                    ? "Signing…"
+                    : reportState === "saved"
+                      ? "Report saved"
+                      : reportState === "failed"
+                        ? "Export failed"
+                        : "Export report"}
+                </button>
+              )}
+              <select
+                value={scope ?? ""}
+                onChange={(e) => setScope(e.target.value ? Number(e.target.value) : null)}
+                disabled={busy}
+                aria-label="Search in"
+                title="Limit the answer to one document"
+                className="mb-0.5 h-9 max-w-[10rem] shrink-0 truncate rounded-lg border border-slate-200 bg-slate-50 px-2 text-xs text-slate-600 outline-none transition hover:border-slate-300 focus:border-brand-500 disabled:opacity-50"
+              >
+                <option value="">All documents</option>
+                {docs.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.filename}
+                  </option>
+                ))}
+              </select>
               <label htmlFor="q" className="sr-only">
                 Question
               </label>
@@ -487,9 +560,25 @@ export default function Chat({ me }: { me: Me }) {
               <>
                 <p className="mb-1 text-sm font-medium text-slate-700">{location(chunk)}</p>
                 <p className="mb-4 break-all font-mono text-[10px] text-slate-400">sha256 {chunk.sha256}</p>
-                <blockquote className="whitespace-pre-wrap rounded-lg border-l-4 border-brand-300 bg-slate-50 p-3 text-sm leading-relaxed text-slate-800">
-                  {chunk.text}
-                </blockquote>
+                {evidence ? (
+                  <>
+                    <p className="mb-2 flex items-center gap-2 text-xs text-slate-500">
+                      <span className="inline-block h-2 w-2 rounded-full bg-amber-400" aria-hidden="true" />
+                      Highlighted: the sentence this answer used ({Math.round(evidence.score * 100)}% word match)
+                    </p>
+                    <blockquote className="whitespace-pre-wrap rounded-lg border-l-4 border-brand-300 bg-slate-50 p-3 text-sm leading-relaxed text-slate-800">
+                      {chunk.text.slice(0, evidence.start)}
+                      <mark className="rounded bg-amber-300/25 px-0.5 text-slate-900 ring-1 ring-amber-300/40">
+                        {chunk.text.slice(evidence.start, evidence.end)}
+                      </mark>
+                      {chunk.text.slice(evidence.end)}
+                    </blockquote>
+                  </>
+                ) : (
+                  <blockquote className="whitespace-pre-wrap rounded-lg border-l-4 border-brand-300 bg-slate-50 p-3 text-sm leading-relaxed text-slate-800">
+                    {chunk.text}
+                  </blockquote>
+                )}
                 <a
                   className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-brand-700 hover:bg-brand-50"
                   href={`/api/documents/${chunk.document_id}/file`}

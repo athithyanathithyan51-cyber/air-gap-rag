@@ -105,6 +105,10 @@ class Attestor:
             s.commit()
         return block
 
+    def sign_digest(self, digest: bytes) -> str:
+        """Ed25519 signature over a digest, base64. Signs exported reports with the chain's key."""
+        return base64.b64encode(self._key.sign(digest)).decode()
+
     def blocks(self, upto: int | None = None) -> list[dict[str, Any]]:
         with self._sf() as s:
             q = select(AttestationBlock).order_by(AttestationBlock.index)

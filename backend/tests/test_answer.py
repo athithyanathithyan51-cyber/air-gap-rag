@@ -39,12 +39,14 @@ async def setup(env: Env, tmp_path: Path) -> None:
         await Ingestor(s, env.services.store, env.embedder, tmp_path, 200, 30).ingest(DOC, "policy.md", "admin")
 
 
-async def run(env: Env, question: str, min_score: float = 0.2, general_chat: bool = True) -> list[dict[str, Any]]:
+async def run(
+    env: Env, question: str, min_score: float = 0.2, general_chat: bool = True, document_id: int | None = None
+) -> list[dict[str, Any]]:
     with env.services.db.session() as s:
         engine = AnswerEngine(
             s, env.services.store, env.embedder, env.llm, top_k=3, min_score=min_score, general_chat=general_chat
         )
-        return [ev async for ev in engine.stream(question)]
+        return [ev async for ev in engine.stream(question, document_id)]
 
 
 # ---------------------------------------------------------------- grounding check (pure)
@@ -96,6 +98,18 @@ async def test_answers_with_citation(env: Env, tmp_path: Path) -> None:
     assert final["verdict"].cited[0].filename == "policy.md"
     assert final["verdict"].cited[0].section == "Attendance"
     assert "75 percent" in env.llm.messages[1]["content"]
+
+
+async def test_scoped_question_only_retrieves_that_document(env: Env, tmp_path: Path) -> None:
+    library = b"# Library\nThe central library is open from 8 am to 8 pm. Students may borrow four books at a time.\n"
+    with env.services.db.session() as s:
+        ingestor = Ingestor(s, env.services.store, env.embedder, tmp_path, 200, 30)
+        await ingestor.ingest(DOC, "policy.md", "admin")
+        library_doc = await ingestor.ingest(library, "library.md", "admin")
+    env.llm.reply = "Students may borrow four books at a time [S1]."
+    events = await run(env, "How many books may students borrow?", document_id=library_doc.document.id)
+    sources = events[0]["sources"]
+    assert sources and all(src["document_id"] == library_doc.document.id for src in sources)
 
 
 async def test_strict_mode_low_score_refuses_without_llm(env: Env, tmp_path: Path) -> None:

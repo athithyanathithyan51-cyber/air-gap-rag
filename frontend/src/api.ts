@@ -105,6 +105,34 @@ const body = (data: unknown): RequestInit => ({
   headers: { "Content-Type": "application/json" },
 });
 
+export type CaptureRow = { name: string; verdict: string | null; has_packets: boolean; size_bytes: number };
+export type PacketRow = {
+  number: number;
+  time: number;
+  length: number;
+  src: string;
+  dst: string;
+  protocol: string;
+  ports: string;
+  info: string;
+};
+export type CaptureDetail = {
+  name: string;
+  verdict: string | null;
+  summary: {
+    packets: number;
+    bytes: number;
+    first: number | null;
+    last: number | null;
+    truncated: boolean;
+    protocols: { name: string; count: number }[];
+    talkers: { address: string; count: number }[];
+  };
+  offset: number;
+  limit: number;
+  packets: PacketRow[];
+};
+
 export const api = {
   me: () => json<Me>("/api/auth/me"),
   refresh: () => json<Me>("/api/auth/refresh", { method: "POST" }),
@@ -124,6 +152,11 @@ export const api = {
   attestationStatus: () => json<AttestationStatus>("/api/attestation/status"),
   verifyBlock: (index: number) => json<BlockVerification>(`/api/attestation/blocks/${index}`),
   verifyAll: () => json<ChainReport>("/api/attestation/verify"),
+  captures: () => json<CaptureRow[]>("/api/traffic/captures"),
+  capture: (name: string, offset: number, limit: number) =>
+    json<CaptureDetail>(`/api/traffic/captures/${name}?offset=${offset}&limit=${limit}`),
+  attestationReport: (indexes: number[]) =>
+    json<Record<string, unknown>>(`/api/attestation/report?indexes=${indexes.join(",")}`),
   acknowledge: () => json<AttestationStatus>("/api/attestation/acknowledge", { method: "POST" }),
 
   users: () => json<(Me & { active: boolean })[]>("/api/admin/users"),
@@ -133,8 +166,8 @@ export const api = {
     json<Me>(`/api/admin/users/${id}`, { method: "PATCH", ...body(patch) }),
   audit: () => json<AuditEntry[]>("/api/admin/audit?limit=200"),
 
-  async *chat(question: string, signal: AbortSignal): AsyncGenerator<ChatEvent> {
-    const res = await raw("/api/chat", { method: "POST", signal, ...body({ question }) });
+  async *chat(question: string, signal: AbortSignal, documentId: number | null = null): AsyncGenerator<ChatEvent> {
+    const res = await raw("/api/chat", { method: "POST", signal, ...body({ question, document_id: documentId }) });
     if (!res.ok || !res.body) {
       let msg = `HTTP ${res.status}`;
       try {

@@ -1,15 +1,17 @@
 import { useEffect, useState, type ComponentType, type SVGProps } from "react";
 import { api, type Me } from "./api";
 import Admin from "./components/Admin";
+import BrandMark from "./components/BrandMark";
 import Chat from "./components/Chat";
 import Documents from "./components/Documents";
 import Help from "./components/Help";
-import { ChatIcon, FileIcon, HelpIcon, LogoutIcon, SettingsIcon, ShieldIcon } from "./components/icons";
+import { ChatIcon, FileIcon, HelpIcon, LogoutIcon, SettingsIcon, TrafficIcon } from "./components/icons";
 import IsolationBadge from "./components/IsolationBadge";
 import Login from "./components/Login";
+import Traffic from "./components/Traffic";
 import { SUBTITLE, TITLE } from "./constants";
 
-type Tab = "chat" | "documents" | "admin" | "help";
+type Tab = "chat" | "documents" | "admin" | "traffic" | "help";
 type TabDef = { key: Tab; label: string; Icon: ComponentType<SVGProps<SVGSVGElement>> };
 
 export default function App() {
@@ -47,18 +49,21 @@ export default function App() {
   const tabs: TabDef[] = [
     { key: "chat", label: "Chat", Icon: ChatIcon },
     { key: "documents", label: "Documents", Icon: FileIcon },
-    ...(me.role === "admin" ? [{ key: "admin" as Tab, label: "Admin", Icon: SettingsIcon }] : []),
+    ...(me.role === "admin"
+      ? [
+          { key: "traffic" as Tab, label: "Traffic", Icon: TrafficIcon },
+          { key: "admin" as Tab, label: "Admin", Icon: SettingsIcon },
+        ]
+      : []),
     { key: "help", label: "Help & limits", Icon: HelpIcon },
   ];
 
   return (
     <div className="flex h-full flex-col font-sans text-slate-900">
       <header className="flex items-center gap-3 border-b border-slate-200 bg-white px-3 py-2 sm:px-4">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-800 text-xl text-white shadow-sm">
-          <ShieldIcon />
-        </div>
+        <BrandMark className="h-9 w-9 shrink-0" />
         <div className="mr-auto min-w-0">
-          <h1 className="truncate text-sm font-bold leading-tight sm:text-base" title={TITLE}>
+          <h1 className="truncate font-display text-base leading-tight sm:text-lg" title={TITLE}>
             {TITLE}
           </h1>
           <p className="truncate text-xs text-slate-500">{SUBTITLE}</p>
@@ -66,7 +71,7 @@ export default function App() {
         <IsolationBadge isAdmin={me.role === "admin"} />
         <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
           <span
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-800 text-xs font-semibold uppercase text-white"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-700 text-xs font-semibold uppercase text-white ring-1 ring-brand-300/40"
             title={`${me.username} (${me.role})`}
             aria-hidden="true"
           >
@@ -116,6 +121,7 @@ export default function App() {
         </div>
         {tab === "documents" && <Documents me={me} />}
         {tab === "admin" && me.role === "admin" && <Admin me={me} />}
+        {tab === "traffic" && me.role === "admin" && <Traffic me={me} />}
         {tab === "help" && <Help />}
       </main>
     </div>
