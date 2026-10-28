@@ -6,9 +6,10 @@ Each line stays here until a test or measurement replaces it. The evidence file 
 | Claim | How it will be measured |
 |-------|-------------------------|
 | Zero non-loopback packets at runtime | tcpdump during startup, ingest, 100 queries and shutdown; `scripts/verify_isolation.py` |
-| Runs on 4 cores / 16 GB with acceptable latency | `eval/run_eval.py` latency p50/p95, plus RAM/CPU sampling |
-| Answer quality (hit-rate@k, citation accuracy, refusal precision/recall, hallucination rate) | Gold set over the real BIT documents |
-| Prompt-injection resistance | Injection cases in the gold set |
+| Runs on the 4-core / 16 GB floor with acceptable latency | Measured on a 12-core, 15.7 GB laptop (`eval/results/20261028T103446Z-rc1-final`): total p50 1.58 s, p95 5.6 s; peak RAM 15.5 GB, peak CPU 87%. The 4-core floor itself is untested. |
+| Hallucination rate | `review.csv` in the 28 Oct run is not yet hand-marked |
+| Answer quality on the real BIT documents | The 28 Oct gold set (50 questions: 37 answerable, 13 not) used the DEMO documents only. Hit-rate@k 1.0, citation accuracy 1.0, refusal precision 0.93, recall 1.0 are measured on DEMO data. |
+| Prompt-injection resistance | Not measured in the 28 Oct run |
 | Clean install from the bundle using only the README | Fresh VM with networking disabled |
 | Isolation monitor detection latency | Bring an interface up and time the break event |
 
@@ -29,5 +30,4 @@ Each line stays here until a test or measurement replaces it. The evidence file 
 - systemd install
 - Full Playwright suite
 - SBOM and licence report
-- Backup, restore and rollback
-- Full 50-question gold set
+- Full gold set over the real BIT documents (the 28 Oct run used DEMO documents)
