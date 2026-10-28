@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import errno
+import sqlite3
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, UploadFile, status
@@ -63,6 +65,11 @@ async def upload(file: UploadFile, admin: AdminDep, svc: SvcDep, s: SessionDep) 
         raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, str(exc)) from exc
     except LLMUnavailableError as exc:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, f"embedding model unavailable: {exc}") from exc
+    except (OSError, sqlite3.OperationalError) as exc:
+        if getattr(exc, "errno", None) == errno.ENOSPC or "disk is full" in str(exc):
+            detail = "disk is full: free space, then upload again"
+            raise HTTPException(status.HTTP_507_INSUFFICIENT_STORAGE, detail) from exc
+        raise
     return {"outcome": result.outcome, "document": doc_out(result.document)}
 
 

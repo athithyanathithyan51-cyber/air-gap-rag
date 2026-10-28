@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import errno
 import json
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 
+from ingest.pipeline import Ingestor
 from tests.conftest import ADMIN_PW, USER_PW, Env, login
 from tests.fakes import CONNECTED_NET
 
@@ -177,3 +180,15 @@ def test_admin_export_and_audit(client: TestClient) -> None:
     assert "BEGIN PUBLIC KEY" in client.get("/api/attestation/pubkey").text
     actions = [e["action"] for e in client.get("/api/admin/audit").json()]
     assert "chat.answer" in actions and "auth.login" in actions
+
+
+def test_disk_full_during_upload_returns_507(client: TestClient, env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    h = login(client, "admin", ADMIN_PW)
+
+    async def no_space(self: Ingestor, data: bytes, filename: str, actor: str) -> None:
+        raise OSError(errno.ENOSPC, "No space left on device")
+
+    monkeypatch.setattr(Ingestor, "ingest", no_space)
+    r = upload(client, h)
+    assert r.status_code == 507
+    assert r.json()["detail"] == "disk is full: free space, then upload again"

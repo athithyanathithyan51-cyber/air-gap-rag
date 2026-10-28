@@ -79,7 +79,13 @@ Apply changes with:
 ## 6. Backup, upgrade, rollback
 - **Upgrade:** unpack the new bundle and run `sudo ./install.sh`. The app-data volume (users, documents, audit, chain) is backed up to `/var/backups/airgap/` first.
 - **Rollback:** run `sudo ./rollback.sh`. It restores the previous image version and the backup taken during the upgrade.
-- **Manual backup:**
+- **Backup (application data):** stop the app, then run
+  `python -m app.cli backup OUT.tar.gz`
+  It writes the database (a consistent snapshot), the attestation keys and the uploaded documents, with a SHA-256 for every file in `MANIFEST.json`. The archive is **not encrypted** and holds the JWT secret and the attestation key file, so store it like the rest of the sensitive data. Logs are not included.
+- **Restore:** stop the app, then run `python -m app.cli restore IN.tar.gz`. Every hash is checked before anything is written, and the archive is rejected if a file was changed or an unexpected path appears. If data already exists, pass `--force`: the old database, keys and documents are moved aside as `*.before-restore-<time>`, not deleted.
+- **Measured (dev laptop, Windows, not the target Ubuntu machine):** a backup of the demo data (10 files, 293 KB) restored into an empty folder with the database integrity check passing. Automated tests cover tampering, path traversal, missing manifests and overwrite refusal. Restoring on a clean Ubuntu machine is **untested**.
+- **Disk full:** an upload that runs out of space returns HTTP 507 with "disk is full: free space, then upload again". Tested with a simulated `ENOSPC`. A real full disk is **untested**.
+- **Manual backup (Docker volume):**
   `sudo docker run --rm -v airgap_app_data:/d:ro -v $PWD:/b --entrypoint tar ollama/ollama:0.40.2 -C /d -czf /b/app_data.tgz .`
   Also keep `/etc/airgap/`.
 - **Uninstall:** `sudo ./uninstall.sh`, which keeps data. Use `--purge` to delete everything.

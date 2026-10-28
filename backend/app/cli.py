@@ -3,6 +3,8 @@
 python -m app.cli create-user NAME [--role admin|user]   (password read from prompt or stdin)
 python -m app.cli export-chain OUT.jsonl                 (plus OUT.pub with the public key)
 python -m app.cli reindex                                (re-chunk all documents with the current chunk settings)
+python -m app.cli backup OUT.tar.gz                      (database, keys, documents; stop the app first)
+python -m app.cli restore IN.tar.gz [--force]            (checks every hash first; --force moves old data aside)
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 
+from app.backup import BackupError, create_backup, restore_backup
 from app.config import Settings, get_settings
 from app.services import build_services
 from attestation.keys import PUBLIC_FILE
@@ -65,11 +68,32 @@ def main(argv: list[str] | None = None) -> int:
     ex = sub.add_parser("export-chain")
     ex.add_argument("out", type=Path)
     sub.add_parser("reindex")
+    bk = sub.add_parser("backup")
+    bk.add_argument("out", type=Path)
+    rs = sub.add_parser("restore")
+    rs.add_argument("archive", type=Path)
+    rs.add_argument("--force", action="store_true", help="move existing data aside before restoring")
     args = ap.parse_args(argv)
 
     settings = get_settings()
     if args.cmd == "reindex":
         return asyncio.run(_reindex(settings))
+    if args.cmd == "backup":
+        try:
+            manifest = create_backup(settings.data_dir, args.out)
+        except BackupError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        print(f"backed up {len(manifest['files'])} files to {args.out}")
+        return 0
+    if args.cmd == "restore":
+        try:
+            manifest = restore_backup(args.archive, settings.data_dir, force=args.force)
+        except BackupError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        print(f"restored {len(manifest['files'])} files from {args.archive} into {settings.data_dir}")
+        return 0
     db = Database(settings.db_path)
     with db.session() as s:
         if args.cmd == "create-user":
