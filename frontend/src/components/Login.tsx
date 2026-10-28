@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { api, type Me } from "../api";
 import { SUBTITLE, TITLE } from "../constants";
-import { AlertIcon, EyeIcon, EyeOffIcon, LockIcon, ShieldIcon } from "./icons";
+import BrandMark from "./BrandMark";
+import { AlertIcon, EyeIcon, EyeOffIcon, LockIcon } from "./icons";
 
 export default function Login({ onLogin }: { onLogin: (me: Me) => void }) {
   const [username, setUsername] = useState("");
@@ -28,16 +29,14 @@ export default function Login({ onLogin }: { onLogin: (me: Me) => void }) {
     "mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
 
   return (
-    <main className="flex min-h-full items-center justify-center bg-gradient-to-br from-slate-50 via-brand-50 to-slate-100 p-4 font-sans">
+    <main className="flex min-h-full items-center justify-center bg-slate-50 p-4 font-sans">
       <div className="w-full max-w-sm animate-fade-in">
-        <div className="mb-6 flex flex-col items-center text-center">
-          <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-800 text-3xl text-white shadow-lg shadow-brand-500/30">
-            <ShieldIcon />
-          </div>
-          <h1 className="text-lg font-bold leading-snug">{TITLE}</h1>
-          <p className="text-sm text-slate-500">{SUBTITLE}</p>
+        <div className="mb-8 flex flex-col items-center text-center">
+          <BrandMark className="mb-4 h-14 w-14" />
+          <h1 className="font-display text-2xl leading-tight text-brand-900">{TITLE}</h1>
+          <p className="mt-1 text-sm text-slate-500">{SUBTITLE}</p>
         </div>
-        <form onSubmit={submit} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/60">
+        <form onSubmit={submit} className="rounded-md border border-slate-200 bg-white p-6 shadow-sm">
           <label className="mb-4 block text-sm font-medium text-slate-700">
             Username
             <input

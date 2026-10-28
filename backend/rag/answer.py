@@ -428,10 +428,10 @@ class AnswerEngine:
         self.max_context_chars = max_context_chars
         self.general_chat = general_chat
 
-    async def retrieve(self, question: str) -> list[Source]:
+    async def retrieve(self, question: str, document_id: int | None = None) -> list[Source]:
         self.store.ensure_collection()
         vector = await self.embedder.embed_query(question)
-        hits = self.store.search(vector, self.top_k)
+        hits = self.store.search(vector, self.top_k, document_id)
         if not hits:
             return []
         rows = {
@@ -501,10 +501,11 @@ class AnswerEngine:
             out.append((name, secs[:per_doc]))
         return out
 
-    async def stream(self, question: str) -> AsyncIterator[dict[str, Any]]:
+    async def stream(self, question: str, document_id: int | None = None) -> AsyncIterator[dict[str, Any]]:
         """Yields events: sources, token*, final. The final event carries the Verdict.
-        A refusal's placeholder text is replaced here with a specific, varied reply."""
-        async for ev in self._stream(question):
+        A refusal's placeholder text is replaced here with a specific, varied reply.
+        With document_id, retrieval only searches that document."""
+        async for ev in self._stream(question, document_id):
             if ev["type"] == "final" and ev["verdict"].status == "refused":
                 v: Verdict = ev["verdict"]
                 # Mention a document only if retrieval found it relevant; cited sources come first.
@@ -513,7 +514,7 @@ class AnswerEngine:
                 v.answer = refusal_reply(normalize(question), v.reason, related)
             yield ev
 
-    async def _stream(self, question: str) -> AsyncIterator[dict[str, Any]]:
+    async def _stream(self, question: str, document_id: int | None = None) -> AsyncIterator[dict[str, Any]]:
         question = normalize(question)
         kind = classify_message(question) if self.general_chat else "document"
         if kind == "about":
@@ -523,7 +524,7 @@ class AnswerEngine:
             yield {"type": "final", "verdict": Verdict("answered", "about", reply), "sources": [], "best_score": 0.0}
             return
         conversational = kind == "chat"
-        sources = [] if conversational else await self.retrieve(question)
+        sources = [] if conversational else await self.retrieve(question, document_id)
         yield {"type": "sources", "sources": [s.public(include_text=False) for s in sources]}
         best = max((s.score for s in sources), default=0.0)
         if conversational or not sources or best < self.min_score:

@@ -22,6 +22,7 @@ router = APIRouter(prefix="/api", tags=["chat"])
 
 class ChatIn(BaseModel):
     question: str = Field(min_length=2, max_length=2000)
+    document_id: int | None = Field(default=None, ge=1)  # limit retrieval to one document
 
 
 def sse(event: dict[str, Any]) -> bytes:
@@ -58,7 +59,7 @@ async def chat(body: ChatIn, user: UserDep, svc: SvcDep, s: SessionDep) -> Strea
 
     async def events() -> AsyncIterator[bytes]:
         try:
-            async for ev in engine.stream(body.question):
+            async for ev in engine.stream(body.question, body.document_id):
                 if ev["type"] != "final":
                     yield sse(ev)
                     continue

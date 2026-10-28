@@ -1,18 +1,35 @@
 @import "tailwindcss";
 
-/* System font stacks only: no web fonts are downloaded or bundled. */
+/* System font stacks only: no web fonts are downloaded or bundled.
+   Visual identity: a quiet reading room. Ink-teal for trust and isolation, brass for citations,
+   cool graphite for everything else. Georgia carries the titles; Segoe UI carries the rest. */
 @theme {
-  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-sans: "Segoe UI Variable", "Segoe UI", system-ui, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif;
   --font-mono: ui-monospace, "Cascadia Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
 
-  --color-brand-50: #eef4ff;
-  --color-brand-100: #dbe6fe;
-  --color-brand-200: #bfd3fe;
-  --color-brand-500: #4f6ef7;
-  --color-brand-600: #3b54e6;
-  --color-brand-700: #2f43c9;
-  --color-brand-800: #2a3aa3;
-  --color-brand-900: #27357f;
+  /* Graphite Console: a dark, quiet workspace. Teal is the accent; brass marks citations.
+     The slate ramp is inverted, so existing text-slate-900 is light and bg-slate-50 is the dark canvas. */
+  --color-brand-50: #0f2a29;
+  --color-brand-100: #163a38;
+  --color-brand-200: #1f5450;
+  --color-brand-300: #2f7d74;
+  --color-brand-500: #2fb3a6;
+  --color-brand-600: #5ed3c4;
+  --color-brand-700: #1f8a7f;
+  --color-brand-800: #9fe6da;
+  --color-brand-900: #e6faf6;
+
+  --color-slate-50: #0b1213;
+  --color-slate-100: #111c1e;
+  --color-slate-200: #1d2b2d;
+  --color-slate-300: #2a3b3d;
+  --color-slate-400: #6f8583;
+  --color-slate-500: #8ca09d;
+  --color-slate-600: #a8bab7;
+  --color-slate-700: #c4d3d0;
+  --color-slate-800: #dbe6e4;
+  --color-slate-900: #f0f6f5;
 
   --animate-fade-in: fade-in 0.25s ease-out both;
   --animate-slide-in: slide-in 0.25s ease-out both;
@@ -47,7 +64,9 @@
     height: 100%;
   }
   body {
-    background: var(--color-slate-50);
+    background:
+      radial-gradient(900px 420px at 50% -120px, rgb(47 179 166 / 0.12), transparent 70%),
+      var(--color-slate-50);
     color: var(--color-slate-900);
     -webkit-font-smoothing: antialiased;
   }
@@ -55,6 +74,66 @@
     outline: 2px solid var(--color-brand-500);
     outline-offset: 2px;
   }
+}
+
+/* Surfaces and status colours for the dark console. Unlayered, so they override the utilities above. */
+.bg-white {
+  background-color: #101a1c;
+}
+.bg-white\/80,
+.bg-white\/95 {
+  background-color: rgb(16 26 28 / 0.86);
+}
+/* Buttons keep white text on hover: the brand scale is light text on the dark console. */
+.hover\:bg-brand-800:hover {
+  background-color: #17776e;
+}
+.bg-red-50 {
+  background-color: rgb(248 113 113 / 0.1);
+}
+.bg-red-100 {
+  background-color: rgb(248 113 113 / 0.18);
+}
+.bg-emerald-50 {
+  background-color: rgb(52 211 153 / 0.1);
+}
+.bg-amber-50 {
+  background-color: rgb(251 191 36 / 0.1);
+}
+.bg-amber-100 {
+  background-color: rgb(251 191 36 / 0.16);
+}
+.text-red-600,
+.text-red-700,
+.text-red-800 {
+  color: #fca5a5;
+}
+.text-emerald-600,
+.text-emerald-700,
+.text-emerald-800 {
+  color: #6ee7b7;
+}
+.text-amber-700,
+.text-amber-800,
+.text-amber-900,
+.text-amber-950 {
+  color: #fcd34d;
+}
+.border-red-200,
+.border-red-300,
+.ring-red-200,
+.border-amber-300,
+.ring-amber-200,
+.ring-amber-300 {
+  border-color: rgb(248 113 113 / 0.3);
+  --tw-ring-color: rgb(248 113 113 / 0.3);
+}
+.ring-emerald-200 {
+  --tw-ring-color: rgb(52 211 153 / 0.3);
+}
+.ring-brand-100,
+.ring-brand-200 {
+  --tw-ring-color: rgb(47 179 166 / 0.25);
 }
 
 @media (prefers-reduced-motion: reduce) {

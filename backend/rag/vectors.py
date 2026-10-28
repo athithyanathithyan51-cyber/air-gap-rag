@@ -56,8 +56,11 @@ class VectorStore:
             wait=True,
         )
 
-    def search(self, vector: list[float], limit: int) -> list[Hit]:
-        res = self.client.query_points(self.collection, query=vector, limit=limit, with_payload=True)
+    def search(self, vector: list[float], limit: int, document_id: int | None = None) -> list[Hit]:
+        flt = None
+        if document_id is not None:
+            flt = models.Filter(must=[models.FieldCondition(key="document_id", match=models.MatchValue(value=document_id))])
+        res = self.client.query_points(self.collection, query=vector, limit=limit, query_filter=flt, with_payload=True)
         return [
             Hit(chunk_id=int(p.id), document_id=int((p.payload or {})["document_id"]), score=float(p.score))
             for p in res.points

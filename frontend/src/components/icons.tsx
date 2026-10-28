@@ -146,3 +146,9 @@ export const TrashIcon = (p: P) => (
     <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
   </Svg>
 );
+
+export const TrafficIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M3 12h4l2-6 4 12 2-6h6" />
+  </Svg>
+);
